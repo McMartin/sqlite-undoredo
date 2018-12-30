@@ -1,0 +1,6 @@
+task:
+  name: Cirrus CI
+  container:
+    image: python:latest
+  tcl_evalfile_check_script:
+    - python -c "import tkinter; tkinter.Tcl().tk.evalfile('sqlite-undoredo.tcl')"
