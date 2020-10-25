@@ -8,6 +8,6 @@ code provided on the page ["Automatic Undo/Redo Using SQLite"][sqlite-org-undore
 the SQLite website.
 
 
-[cirrus-ci-badge]: https://api.cirrus-ci.com/github/McMartin/sqlite-undoredo.svg?branch=master
+[cirrus-ci-badge]: https://api.cirrus-ci.com/github/McMartin/sqlite-undoredo.svg?branch=main
 [cirrus-ci]: https://cirrus-ci.com/github/McMartin/sqlite-undoredo
 [sqlite-org-undoredo]: https://www.sqlite.org/undoredo.html
