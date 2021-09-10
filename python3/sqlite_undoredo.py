@@ -84,7 +84,7 @@ class SQLiteUndoRedo:
         are made to invoke ::undo::barrier no later than the next idle moment.
         """
         _undo = self._undo
-        if _undo['pending'] == "":
+        if _undo['pending'] == []:
             raise NotImplementedError
             # set _undo(pending) after idle ::undo::barrier
 
