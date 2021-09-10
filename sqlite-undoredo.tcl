@@ -228,7 +228,7 @@ proc _create_triggers {db args} {
 # title:  Drop all of the triggers that _create_triggers created
 #
 proc _drop_triggers {db} {
-  set tlist $db eval {SELECT name FROM sqlite_temp_master
+  set tlist $db eval {SELECT name FROM sqlite_temp_schema
                        WHERE type='trigger'}
   foreach trigger $tlist {
     if {!regexp {_.*_(i|u|d)t$} $trigger} continue
