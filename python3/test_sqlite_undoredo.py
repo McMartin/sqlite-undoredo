@@ -264,7 +264,7 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
     def _get_triggers(self, db):
         return db.execute(
-            "SELECT name FROM sqlite_temp_schema WHERE type='trigger'").fetchall()
+            "SELECT name FROM sqlite_temp_master WHERE type='trigger'").fetchall()
 
     def test__create_triggers_no_tables(self):
         self.sqlur._create_triggers(self.test_db)
