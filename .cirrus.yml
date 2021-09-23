@@ -11,6 +11,7 @@ task:
         - python -m pip install flake8
         - python -m flake8
       python_test_script:
+        - python -m pip install apsw
         - python python3/test_sqlite_undoredo.py
 
     - name: cpp17

@@ -12,10 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sqlite3
 import unittest
 
 from unittest import mock
+
+import apsw
 
 from sqlite_undoredo import SQLiteUndoRedo
 
@@ -23,7 +24,7 @@ from sqlite_undoredo import SQLiteUndoRedo
 class SQLiteUndoRedoTest(unittest.TestCase):
 
     def setUp(self):
-        self.db_connection = sqlite3.connect(':memory:', isolation_level=None)
+        self.db_connection = apsw.Connection(':memory:')
 
         self.test_db = self.db_connection.cursor()
         self.test_db.execute("CREATE TABLE tbl1(a)")

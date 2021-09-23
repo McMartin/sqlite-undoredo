@@ -15,7 +15,6 @@
 """Translation of the TCL example code from https://www.sqlite.org/undoredo.html."""
 
 import re
-import sqlite3
 import sys
 
 
@@ -23,7 +22,9 @@ if sys.version_info < (3, 6):
     sys.exit('Python version 3.6 or later is required')
 
 
-class SQLiteUndoRedo:
+class _SQLiteUndoRedo:
+
+    exception_type = None
 
     def activate(self, *args):
         """Start up the undo/redo system.
@@ -187,8 +188,8 @@ class SQLiteUndoRedo:
             # .mb.edit entryconfig Redo -state normal
             # .bb.redo config -state normal
 
-    @staticmethod
-    def _create_triggers(db, *args):
+    @classmethod
+    def _create_triggers(cls, db, *args):
         """Create change recording triggers for all tables listed.
 
         Create a temporary table in the database named "undolog".  Create
@@ -198,7 +199,7 @@ class SQLiteUndoRedo:
         """
         try:
             db.execute("DROP TABLE undolog")
-        except sqlite3.OperationalError:
+        except cls.exception_type:
             pass
         db.execute("CREATE TEMP TABLE undolog(seq integer primary key, sql text)")
         for tbl in args:
@@ -226,10 +227,10 @@ class SQLiteUndoRedo:
                 sql += f",'||quote(old.{name})||'"
             sql += ")');\nEND;\n"
 
-            db.executescript(sql)
+            cls.execute_multiple(db, sql)
 
-    @staticmethod
-    def _drop_triggers(db):
+    @classmethod
+    def _drop_triggers(cls, db):
         """Drop all of the triggers that _create_triggers created."""
         tlist = db.execute(
             "SELECT name FROM sqlite_temp_master WHERE type='trigger'").fetchall()
@@ -239,7 +240,7 @@ class SQLiteUndoRedo:
             db.execute(f"DROP TRIGGER {trigger};")
         try:
             db.execute("DROP TABLE undolog")
-        except sqlite3.OperationalError:
+        except cls.exception_type:
             pass
 
     def _start_interval(self):
@@ -275,3 +276,17 @@ class SQLiteUndoRedo:
         _undo[v2].append([begin, end])
         self._start_interval()
         # self.refresh()
+
+
+try:
+    import apsw
+
+    class SQLiteUndoRedo(_SQLiteUndoRedo):
+
+        exception_type = apsw.SQLError
+
+        @classmethod
+        def execute_multiple(cls, db, sql):
+            db.execute(sql)
+except ImportError:
+    pass
