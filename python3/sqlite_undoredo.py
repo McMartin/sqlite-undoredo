@@ -1,4 +1,4 @@
-# Copyright 2019 Alain Martin
+# Copyright 2019, 2021 Alain Martin
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -84,7 +84,7 @@ class SQLiteUndoRedo:
         are made to invoke ::undo::barrier no later than the next idle moment.
         """
         _undo = self._undo
-        if _undo['pending'] == "":
+        if _undo['pending'] == []:
             raise NotImplementedError
             # set _undo(pending) after idle ::undo::barrier
 
@@ -232,7 +232,7 @@ class SQLiteUndoRedo:
     def _drop_triggers(db):
         """Drop all of the triggers that _create_triggers created."""
         tlist = db.execute(
-            "SELECT name FROM sqlite_temp_schema WHERE type='trigger'").fetchall()
+            "SELECT name FROM sqlite_temp_master WHERE type='trigger'").fetchall()
         for (trigger,) in tlist:
             if not re.match("_.*_(i|u|d)t$", trigger):
                 continue
