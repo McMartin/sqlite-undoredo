@@ -23,8 +23,7 @@ from sqlite_undoredo import SQLiteUndoRedo
 class SQLiteUndoRedoTest(unittest.TestCase):
 
     def setUp(self):
-        self.test_db = sqlite3.connect(':memory:')
-        self.test_db.isolation_level = None
+        self.test_db = sqlite3.connect(':memory:', isolation_level=None)
         self.test_db.execute("CREATE TABLE tbl1(a)")
         self.test_db.execute("CREATE TABLE tbl2(b)")
 
