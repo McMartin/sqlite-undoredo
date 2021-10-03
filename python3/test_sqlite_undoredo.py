@@ -242,11 +242,141 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         mock_step.assert_called_with('undostack', 'redostack')
 
+    def test_undo_insert(self):
+        self.sqlur.activate('tbl1')
+        self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (23,))
+        self.sqlur.barrier()
+
+        self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [(23,)])
+
+        self.sqlur.undo()
+
+        self.assertEqual(self.sqlur._undo['undostack'], [])
+        self.assertEqual(self.sqlur._undo['redostack'], [[1, 1]])
+        self.assertEqual(self.sqlur._undo['firstlog'], 2)
+        self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [])
+
+    def test_undo_update(self):
+        self.sqlur.activate('tbl1')
+        self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (23,))
+        self.sqlur.barrier()
+        self.test_db.execute("UPDATE tbl1 SET a=? WHERE a=?", (42, 23,))
+        self.sqlur.barrier()
+
+        self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [(42,)])
+
+        self.sqlur.undo()
+
+        self.assertEqual(self.sqlur._undo['undostack'], [[1, 1]])
+        self.assertEqual(self.sqlur._undo['redostack'], [[2, 2]])
+        self.assertEqual(self.sqlur._undo['firstlog'], 3)
+        self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [(23,)])
+
+    def test_undo_delete(self):
+        self.sqlur.activate('tbl1')
+        self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (23,))
+        self.sqlur.barrier()
+        self.test_db.execute("DELETE FROM tbl1 WHERE a=?", (23,))
+        self.sqlur.barrier()
+
+        self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [])
+
+        self.sqlur.undo()
+
+        self.assertEqual(self.sqlur._undo['undostack'], [[1, 1]])
+        self.assertEqual(self.sqlur._undo['redostack'], [[2, 2]])
+        self.assertEqual(self.sqlur._undo['firstlog'], 3)
+        self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [(23,)])
+
+    def test_undo_several_changes(self):
+        self.sqlur.activate('tbl1')
+        self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (23,))
+        self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (42,))
+        self.test_db.execute("UPDATE tbl1 SET a=? WHERE a=?", (69, 42))
+        self.test_db.execute("DELETE FROM tbl1 WHERE a=?", (23,))
+        self.sqlur.barrier()
+
+        self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [(69,)])
+
+        self.sqlur.undo()
+
+        self.assertEqual(self.sqlur._undo['undostack'], [])
+        self.assertEqual(self.sqlur._undo['redostack'], [[1, 4]])
+        self.assertEqual(self.sqlur._undo['firstlog'], 5)
+        self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [])
+
     def test_redo(self):
         with mock.patch.object(self.sqlur, '_step') as mock_step:
             self.sqlur.redo()
 
         mock_step.assert_called_with('redostack', 'undostack')
+
+    def test_redo_insert(self):
+        self.sqlur.activate('tbl1')
+        self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (23,))
+        self.sqlur.barrier()
+        self.sqlur.undo()
+
+        self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [])
+
+        self.sqlur.redo()
+
+        self.assertEqual(self.sqlur._undo['undostack'], [[1, 1]])
+        self.assertEqual(self.sqlur._undo['redostack'], [])
+        self.assertEqual(self.sqlur._undo['firstlog'], 2)
+        self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [(23,)])
+
+    def test_redo_update(self):
+        self.sqlur.activate('tbl1')
+        self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (23,))
+        self.sqlur.barrier()
+        self.test_db.execute("UPDATE tbl1 SET a=? WHERE a=?", (42, 23,))
+        self.sqlur.barrier()
+        self.sqlur.undo()
+
+        self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [(23,)])
+
+        self.sqlur.redo()
+
+        self.assertEqual(self.sqlur._undo['undostack'], [[1, 1], [2, 2]])
+        self.assertEqual(self.sqlur._undo['redostack'], [])
+        self.assertEqual(self.sqlur._undo['firstlog'], 3)
+        self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [(42,)])
+
+    def test_redo_delete(self):
+        self.sqlur.activate('tbl1')
+        self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (23,))
+        self.sqlur.barrier()
+        self.test_db.execute("DELETE FROM tbl1 WHERE a=?", (23,))
+        self.sqlur.barrier()
+        self.sqlur.undo()
+
+        self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [(23,)])
+
+        self.sqlur.redo()
+
+        self.assertEqual(self.sqlur._undo['undostack'], [[1, 1], [2, 2]])
+        self.assertEqual(self.sqlur._undo['redostack'], [])
+        self.assertEqual(self.sqlur._undo['firstlog'], 3)
+        self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [])
+
+    def test_redo_several_changes(self):
+        self.sqlur.activate('tbl1')
+        self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (23,))
+        self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (42,))
+        self.test_db.execute("UPDATE tbl1 SET a=? WHERE a=?", (69, 42))
+        self.test_db.execute("DELETE FROM tbl1 WHERE a=?", (23,))
+        self.sqlur.barrier()
+        self.sqlur.undo()
+
+        self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [])
+
+        self.sqlur.redo()
+
+        self.assertEqual(self.sqlur._undo['undostack'], [[1, 4]])
+        self.assertEqual(self.sqlur._undo['redostack'], [])
+        self.assertEqual(self.sqlur._undo['firstlog'], 5)
+        self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [(69,)])
 
     def test___init__(self):
         self.assertIs(self.sqlur._db, self.test_db)
@@ -304,136 +434,6 @@ class SQLiteUndoRedoTest(unittest.TestCase):
         self.sqlur._start_interval()
 
         self.assertEqual(self.sqlur._undo['firstlog'], 3)
-
-    def test__step_undo_insert(self):
-        self.sqlur.activate('tbl1')
-        self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (23,))
-        self.sqlur.barrier()
-
-        self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [(23,)])
-
-        self.sqlur.undo()
-
-        self.assertEqual(self.sqlur._undo['undostack'], [])
-        self.assertEqual(self.sqlur._undo['redostack'], [[1, 1]])
-        self.assertEqual(self.sqlur._undo['firstlog'], 2)
-        self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [])
-
-    def test__step_undo_update(self):
-        self.sqlur.activate('tbl1')
-        self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (23,))
-        self.sqlur.barrier()
-        self.test_db.execute("UPDATE tbl1 SET a=? WHERE a=?", (42, 23,))
-        self.sqlur.barrier()
-
-        self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [(42,)])
-
-        self.sqlur.undo()
-
-        self.assertEqual(self.sqlur._undo['undostack'], [[1, 1]])
-        self.assertEqual(self.sqlur._undo['redostack'], [[2, 2]])
-        self.assertEqual(self.sqlur._undo['firstlog'], 3)
-        self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [(23,)])
-
-    def test__step_undo_delete(self):
-        self.sqlur.activate('tbl1')
-        self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (23,))
-        self.sqlur.barrier()
-        self.test_db.execute("DELETE FROM tbl1 WHERE a=?", (23,))
-        self.sqlur.barrier()
-
-        self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [])
-
-        self.sqlur.undo()
-
-        self.assertEqual(self.sqlur._undo['undostack'], [[1, 1]])
-        self.assertEqual(self.sqlur._undo['redostack'], [[2, 2]])
-        self.assertEqual(self.sqlur._undo['firstlog'], 3)
-        self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [(23,)])
-
-    def test__step_undo_several_changes(self):
-        self.sqlur.activate('tbl1')
-        self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (23,))
-        self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (42,))
-        self.test_db.execute("UPDATE tbl1 SET a=? WHERE a=?", (69, 42))
-        self.test_db.execute("DELETE FROM tbl1 WHERE a=?", (23,))
-        self.sqlur.barrier()
-
-        self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [(69,)])
-
-        self.sqlur.undo()
-
-        self.assertEqual(self.sqlur._undo['undostack'], [])
-        self.assertEqual(self.sqlur._undo['redostack'], [[1, 4]])
-        self.assertEqual(self.sqlur._undo['firstlog'], 5)
-        self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [])
-
-    def test__step_redo_insert(self):
-        self.sqlur.activate('tbl1')
-        self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (23,))
-        self.sqlur.barrier()
-        self.sqlur.undo()
-
-        self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [])
-
-        self.sqlur.redo()
-
-        self.assertEqual(self.sqlur._undo['undostack'], [[1, 1]])
-        self.assertEqual(self.sqlur._undo['redostack'], [])
-        self.assertEqual(self.sqlur._undo['firstlog'], 2)
-        self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [(23,)])
-
-    def test__step_redo_update(self):
-        self.sqlur.activate('tbl1')
-        self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (23,))
-        self.sqlur.barrier()
-        self.test_db.execute("UPDATE tbl1 SET a=? WHERE a=?", (42, 23,))
-        self.sqlur.barrier()
-        self.sqlur.undo()
-
-        self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [(23,)])
-
-        self.sqlur.redo()
-
-        self.assertEqual(self.sqlur._undo['undostack'], [[1, 1], [2, 2]])
-        self.assertEqual(self.sqlur._undo['redostack'], [])
-        self.assertEqual(self.sqlur._undo['firstlog'], 3)
-        self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [(42,)])
-
-    def test__step_redo_delete(self):
-        self.sqlur.activate('tbl1')
-        self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (23,))
-        self.sqlur.barrier()
-        self.test_db.execute("DELETE FROM tbl1 WHERE a=?", (23,))
-        self.sqlur.barrier()
-        self.sqlur.undo()
-
-        self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [(23,)])
-
-        self.sqlur.redo()
-
-        self.assertEqual(self.sqlur._undo['undostack'], [[1, 1], [2, 2]])
-        self.assertEqual(self.sqlur._undo['redostack'], [])
-        self.assertEqual(self.sqlur._undo['firstlog'], 3)
-        self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [])
-
-    def test__step_redo_several_changes(self):
-        self.sqlur.activate('tbl1')
-        self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (23,))
-        self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (42,))
-        self.test_db.execute("UPDATE tbl1 SET a=? WHERE a=?", (69, 42))
-        self.test_db.execute("DELETE FROM tbl1 WHERE a=?", (23,))
-        self.sqlur.barrier()
-        self.sqlur.undo()
-
-        self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [])
-
-        self.sqlur.redo()
-
-        self.assertEqual(self.sqlur._undo['undostack'], [[1, 4]])
-        self.assertEqual(self.sqlur._undo['redostack'], [])
-        self.assertEqual(self.sqlur._undo['firstlog'], 5)
-        self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [(69,)])
 
 
 if __name__ == '__main__':
