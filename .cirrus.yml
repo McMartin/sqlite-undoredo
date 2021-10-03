@@ -1,17 +1,14 @@
 task:
-  name: Cirrus CI
-
-  container:
-    matrix:
-      - image: python:3.6
-      - image: python:latest
-
-  tcl_evalfile_script:
-    - python -c "import tkinter; tkinter.Tcl().tk.evalfile('sqlite-undoredo.tcl')"
-
-  python_lint_script:
-    - python -m pip install flake8
-    - python -m flake8
-
-  python_test_script:
-    - python python3/test_sqlite_undoredo.py
+  matrix:
+    - name: python3
+      container:
+        matrix:
+          - image: python:3.6
+          - image: python:latest
+      tcl_evalfile_script:
+        - python -c "import tkinter; tkinter.Tcl().tk.evalfile('sqlite-undoredo.tcl')"
+      python_lint_script:
+        - python -m pip install flake8
+        - python -m flake8
+      python_test_script:
+        - python python3/test_sqlite_undoredo.py
