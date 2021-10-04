@@ -1,0 +1,11 @@
+Language: Cpp
+
+AlwaysBreakTemplateDeclarations: Yes
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortIfStatementsOnASingleLine: WithoutElse
+BraceWrapping:
+  AfterStruct: true
+BreakBeforeBraces: Custom
+ColumnLimit: 90
+MaxEmptyLinesToKeep: 2
+PointerAlignment: Left
