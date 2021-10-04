@@ -12,3 +12,15 @@ task:
         - python -m flake8
       python_test_script:
         - python python3/test_sqlite_undoredo.py
+
+    - name: cpp17
+      container:
+        image: kunitoki/clang-9:latest
+      cpp_format_script:
+        - clang-format -version
+        - 'git ls-files cpp17/"*."{cpp,hpp} | xargs -d\\n clang-format -i -style=file -verbose'
+        - git diff --exit-code
+      cpp_test_script:
+        - cmake -S cpp17 -B cpp17/build
+        - cmake --build cpp17/build
+        - (cd cpp17/build && ctest)
