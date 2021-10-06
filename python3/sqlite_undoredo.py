@@ -50,9 +50,9 @@ class SQLiteUndoRedo:
         if not self._active:
             return
         end = self._db.execute("SELECT coalesce(max(seq),0) FROM undolog").fetchone()[0]
-        begin = _undo['firstlog']
+        begin = self._firstlog
         self._start_interval()
-        if begin == _undo['firstlog']:
+        if begin == self._firstlog:
             return
         _undo['undostack'].append([begin, end])
         _undo['redostack'] = []
@@ -70,7 +70,7 @@ class SQLiteUndoRedo:
         self._undo = {}
         self._undo['undostack'] = []
         self._undo['redostack'] = []
-        self._undo['firstlog'] = 1
+        self._firstlog = 1
 
     def _create_triggers(self, *args):
         try:
@@ -119,7 +119,7 @@ class SQLiteUndoRedo:
 
     def _start_interval(self):
         _undo = self._undo
-        _undo['firstlog'] = self._db.execute(
+        self._firstlog = self._db.execute(
             "SELECT coalesce(max(seq),0)+1 FROM undolog").fetchone()[0]
 
     def _step(self, v1, v2):
@@ -132,13 +132,13 @@ class SQLiteUndoRedo:
              " ORDER BY seq DESC"
         sqllist = self._db.execute(q1).fetchall()
         self._db.execute(f"DELETE FROM undolog WHERE seq>={begin} AND seq<={end}")
-        _undo['firstlog'] = self._db.execute(
+        self._firstlog = self._db.execute(
             "SELECT coalesce(max(seq),0)+1 FROM undolog").fetchone()[0]
         for (sql,) in sqllist:
             self._db.execute(sql)
         self._db.execute('COMMIT')
 
         end = self._db.execute("SELECT coalesce(max(seq),0) FROM undolog").fetchone()[0]
-        begin = _undo['firstlog']
+        begin = self._firstlog
         _undo[v2].append([begin, end])
         self._start_interval()

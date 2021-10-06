@@ -159,7 +159,7 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.assertEqual(self.sqlur._undo['undostack'], [])
         self.assertEqual(self.sqlur._undo['redostack'], [[1, 1]])
-        self.assertEqual(self.sqlur._undo['firstlog'], 2)
+        self.assertEqual(self.sqlur._firstlog, 2)
         self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [])
 
     def test_undo_update(self):
@@ -175,7 +175,7 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.assertEqual(self.sqlur._undo['undostack'], [[1, 1]])
         self.assertEqual(self.sqlur._undo['redostack'], [[2, 2]])
-        self.assertEqual(self.sqlur._undo['firstlog'], 3)
+        self.assertEqual(self.sqlur._firstlog, 3)
         self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [(23,)])
 
     def test_undo_delete(self):
@@ -191,7 +191,7 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.assertEqual(self.sqlur._undo['undostack'], [[1, 1]])
         self.assertEqual(self.sqlur._undo['redostack'], [[2, 2]])
-        self.assertEqual(self.sqlur._undo['firstlog'], 3)
+        self.assertEqual(self.sqlur._firstlog, 3)
         self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [(23,)])
 
     def test_undo_several_changes(self):
@@ -208,7 +208,7 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.assertEqual(self.sqlur._undo['undostack'], [])
         self.assertEqual(self.sqlur._undo['redostack'], [[1, 4]])
-        self.assertEqual(self.sqlur._undo['firstlog'], 5)
+        self.assertEqual(self.sqlur._firstlog, 5)
         self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [])
 
     def test_redo(self):
@@ -229,7 +229,7 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.assertEqual(self.sqlur._undo['undostack'], [[1, 1]])
         self.assertEqual(self.sqlur._undo['redostack'], [])
-        self.assertEqual(self.sqlur._undo['firstlog'], 2)
+        self.assertEqual(self.sqlur._firstlog, 2)
         self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [(23,)])
 
     def test_redo_update(self):
@@ -246,7 +246,7 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.assertEqual(self.sqlur._undo['undostack'], [[1, 1], [2, 2]])
         self.assertEqual(self.sqlur._undo['redostack'], [])
-        self.assertEqual(self.sqlur._undo['firstlog'], 3)
+        self.assertEqual(self.sqlur._firstlog, 3)
         self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [(42,)])
 
     def test_redo_delete(self):
@@ -263,7 +263,7 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.assertEqual(self.sqlur._undo['undostack'], [[1, 1], [2, 2]])
         self.assertEqual(self.sqlur._undo['redostack'], [])
-        self.assertEqual(self.sqlur._undo['firstlog'], 3)
+        self.assertEqual(self.sqlur._firstlog, 3)
         self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [])
 
     def test_redo_several_changes(self):
@@ -281,7 +281,7 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.assertEqual(self.sqlur._undo['undostack'], [[1, 4]])
         self.assertEqual(self.sqlur._undo['redostack'], [])
-        self.assertEqual(self.sqlur._undo['firstlog'], 5)
+        self.assertEqual(self.sqlur._firstlog, 5)
         self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [(69,)])
 
     def test___init__(self):
@@ -292,9 +292,9 @@ class SQLiteUndoRedoTest(unittest.TestCase):
             {
                 'undostack': [],
                 'redostack': [],
-                'firstlog': 1,
             },
         )
+        self.assertEqual(self.sqlur._firstlog, 1)
 
     def _get_triggers(self, db):
         return db.execute(
@@ -330,14 +330,14 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.sqlur._start_interval()
 
-        self.assertEqual(self.sqlur._undo['firstlog'], 1)
+        self.assertEqual(self.sqlur._firstlog, 1)
 
         self.test_db.executemany("INSERT INTO tbl1 VALUES(?)", [(23,), (42,)])
         self.sqlur.barrier()
 
         self.sqlur._start_interval()
 
-        self.assertEqual(self.sqlur._undo['firstlog'], 3)
+        self.assertEqual(self.sqlur._firstlog, 3)
 
 
 if __name__ == '__main__':
