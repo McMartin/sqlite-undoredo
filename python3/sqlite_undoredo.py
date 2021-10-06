@@ -34,7 +34,6 @@ class SQLiteUndoRedo:
         _undo['undostack'] = []
         _undo['redostack'] = []
         _undo['active'] = 1
-        _undo['freeze'] = -1
         self._start_interval()
 
     def deactivate(self):
@@ -45,25 +44,6 @@ class SQLiteUndoRedo:
         _undo['undostack'] = []
         _undo['redostack'] = []
         _undo['active'] = 0
-        _undo['freeze'] = -1
-
-    def freeze(self):
-        _undo = self._undo
-        if 'freeze' not in _undo:
-            return
-        if _undo['freeze'] >= 0:
-            raise Exception("recursive call to SQLiteUndoRedo.freeze")
-        _undo['freeze'] = self._db.execute(
-            "SELECT coalesce(max(seq),0) FROM undolog").fetchone()[0]
-
-    def unfreeze(self):
-        _undo = self._undo
-        if 'freeze' not in _undo:
-            return
-        if _undo['freeze'] < 0:
-            raise Exception("called SQLiteUndoRedo.unfreeze while not frozen")
-        self._db.execute(f"DELETE FROM undolog WHERE seq>{_undo['freeze']}")
-        _undo['freeze'] = -1
 
     def barrier(self):
         _undo = self._undo
@@ -71,8 +51,6 @@ class SQLiteUndoRedo:
         if not _undo['active']:
             return
         end = self._db.execute("SELECT coalesce(max(seq),0) FROM undolog").fetchone()[0]
-        if _undo['freeze'] >= 0 and end > _undo['freeze']:
-            end = _undo['freeze']
         begin = _undo['firstlog']
         self._start_interval()
         if begin == _undo['firstlog']:

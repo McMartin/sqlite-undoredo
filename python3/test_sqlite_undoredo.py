@@ -45,7 +45,6 @@ class SQLiteUndoRedoTest(unittest.TestCase):
         self.assertEqual(self.sqlur._undo['undostack'], [])
         self.assertEqual(self.sqlur._undo['redostack'], [])
         self.assertEqual(self.sqlur._undo['active'], 1)
-        self.assertEqual(self.sqlur._undo['freeze'], -1)
 
         mock_start_interval.assert_called_with()
 
@@ -59,7 +58,6 @@ class SQLiteUndoRedoTest(unittest.TestCase):
         self.assertEqual(self.sqlur._undo['undostack'], [])
         self.assertEqual(self.sqlur._undo['redostack'], [])
         self.assertEqual(self.sqlur._undo['active'], 1)
-        self.assertEqual(self.sqlur._undo['freeze'], -1)
 
         mock_start_interval.assert_called_with()
 
@@ -87,7 +85,6 @@ class SQLiteUndoRedoTest(unittest.TestCase):
         self.assertEqual(self.sqlur._undo['undostack'], [])
         self.assertEqual(self.sqlur._undo['redostack'], [])
         self.assertEqual(self.sqlur._undo['active'], 0)
-        self.assertEqual(self.sqlur._undo['freeze'], -1)
 
     def test_deactivate_while_not_active(self):
         self.assertEqual(self.sqlur._undo['active'], 0)
@@ -96,87 +93,6 @@ class SQLiteUndoRedoTest(unittest.TestCase):
             self.sqlur.deactivate()
 
         mock_drop_triggers.assert_not_called()
-
-    def test_freeze(self):
-        self.sqlur.activate('tbl1')
-        self.assertEqual(self.sqlur._undo['freeze'], -1)
-
-        self.test_db.executemany("INSERT INTO tbl1 VALUES(?)", [(23,), (42,)])
-        self.sqlur.barrier()
-
-        self.sqlur.freeze()
-
-        self.assertEqual(self.sqlur._undo['freeze'], 2)
-
-    def test_freeze_while_frozen(self):
-        self.sqlur.activate('tbl1')
-        self.assertEqual(self.sqlur._undo['freeze'], -1)
-
-        self.sqlur.freeze()
-
-        self.assertEqual(self.sqlur._undo['freeze'], 0)
-
-        with self.assertRaises(Exception):
-            self.sqlur.freeze()
-
-    def test_freeze_before_activate(self):
-        self.assertEqual(self.sqlur._undo['active'], 0)
-
-        with mock.patch.object(self.sqlur, '_db') as mock_db:
-            self.sqlur.freeze()
-
-        mock_db.execute.assert_not_called()
-
-        self.sqlur.activate()
-
-        with mock.patch.object(self.sqlur, '_db') as mock_db:
-            self.sqlur.freeze()
-
-        self.assertEqual(mock_db.execute.call_count, 1)
-
-    def test_unfreeze(self):
-        self.sqlur.activate('tbl1')
-        self.assertEqual(self.sqlur._undo['freeze'], -1)
-
-        self.test_db.executemany("INSERT INTO tbl1 VALUES(?)", [(23,), (42,)])
-        self.sqlur.barrier()
-
-        self.sqlur.freeze()
-        self.assertEqual(self.sqlur._undo['freeze'], 2)
-
-        self.test_db.executemany("INSERT INTO tbl1 VALUES(?)", [(69,), (404,)])
-        self.sqlur.barrier()
-
-        self.assertEqual(len(self.test_db.execute("SELECT * FROM undolog").fetchall()), 4)
-
-        self.sqlur.unfreeze()
-
-        self.assertEqual(len(self.test_db.execute("SELECT * FROM undolog").fetchall()), 2)
-
-        self.assertEqual(self.sqlur._undo['freeze'], -1)
-
-    def test_unfreeze_before_activate(self):
-        self.assertEqual(self.sqlur._undo['active'], 0)
-
-        with mock.patch.object(self.sqlur, '_db') as mock_db:
-            self.sqlur.unfreeze()
-
-        mock_db.execute.assert_not_called()
-
-        self.sqlur.activate()
-        self.sqlur.freeze()
-
-        with mock.patch.object(self.sqlur, '_db') as mock_db:
-            self.sqlur.unfreeze()
-
-        self.assertEqual(mock_db.execute.call_count, 1)
-
-    def test_unfreeze_while_not_frozen(self):
-        self.sqlur.activate('tbl1')
-        self.assertEqual(self.sqlur._undo['freeze'], -1)
-
-        with self.assertRaises(Exception):
-            self.sqlur.unfreeze()
 
     def test_barrier(self):
         self.sqlur.activate('tbl1')
@@ -214,18 +130,6 @@ class SQLiteUndoRedoTest(unittest.TestCase):
             self.sqlur.barrier()
 
         self.assertEqual(mock_db.execute.call_count, 2)
-
-    def test_barrier_while_frozen(self):
-        self.sqlur.activate('tbl1')
-
-        self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (23,))
-        self.sqlur.barrier()
-        self.sqlur.freeze()
-        self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (42,))
-
-        self.sqlur.barrier()
-
-        self.assertEqual(self.sqlur._undo['undostack'], [[1, 1], [2, 1]])
 
     def test_barrier_after_no_changes(self):
         self.sqlur.activate('tbl1')
