@@ -26,26 +26,7 @@ if sys.version_info < (3, 6):
 
 class SQLiteUndoRedo:
 
-    def activate(self, *args):
-        if self._active:
-            return
-        self._create_triggers(*args)
-        self._stack['undo'] = []
-        self._stack['redo'] = []
-        self._active = True
-        self._start_interval()
-
-    def deactivate(self):
-        if not self._active:
-            return
-        self._drop_triggers()
-        self._stack['undo'] = []
-        self._stack['redo'] = []
-        self._active = False
-
     def barrier(self):
-        if not self._active:
-            return
         end = self._db.execute("SELECT coalesce(max(seq),0) FROM undolog").fetchone()[0]
         begin = self._firstlog
         self._start_interval()
@@ -69,11 +50,10 @@ class SQLiteUndoRedo:
             pass
         self._db.execute("CREATE TEMP TABLE undolog(seq integer primary key, sql text)")
 
-        self._active = False
         self._stack = {'undo': [], 'redo': []}
-        self._firstlog = 1
+        self._start_interval()
 
-    def _create_triggers(self, *args):
+    def install(self, *args):
         for tbl in args:
             collist = self._db.execute(f"pragma table_info({tbl})").fetchall()
             sql = f"CREATE TEMP TRIGGER _{tbl}_it AFTER INSERT ON {tbl} BEGIN\n"
@@ -101,13 +81,11 @@ class SQLiteUndoRedo:
 
             self._db.execute(sql)
 
-    def _drop_triggers(self):
-        tlist = self._db.execute(
-            "SELECT name FROM sqlite_temp_schema WHERE type='trigger'").fetchall()
-        for (trigger,) in tlist:
-            if not re.match("_.*_(i|u|d)t$", trigger):
-                continue
-            self._db.execute(f"DROP TRIGGER {trigger};")
+    def uninstall(self, *args):
+        for tbl in args:
+            self._db.execute(f"DROP TRIGGER IF EXISTS _{tbl}_it")
+            self._db.execute(f"DROP TRIGGER IF EXISTS _{tbl}_ut")
+            self._db.execute(f"DROP TRIGGER IF EXISTS _{tbl}_dt")
 
     def _start_interval(self):
         self._firstlog = self._db.execute(

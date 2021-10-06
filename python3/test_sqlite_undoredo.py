@@ -40,67 +40,8 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.db_connection.close()
 
-    def test_activate_one_table(self):
-        with mock.patch.object(self.sqlur, '_create_triggers') as mock_create_triggers:
-            with mock.patch.object(self.sqlur, '_start_interval') as mock_start_interval:
-                self.sqlur.activate('tbl1')
-
-        mock_create_triggers.assert_called_with('tbl1')
-
-        self.assertEqual(self.sqlur._stack['undo'], [])
-        self.assertEqual(self.sqlur._stack['redo'], [])
-        self.assertEqual(self.sqlur._active, True)
-
-        mock_start_interval.assert_called_with()
-
-    def test_activate_several_tables(self):
-        with mock.patch.object(self.sqlur, '_create_triggers') as mock_create_triggers:
-            with mock.patch.object(self.sqlur, '_start_interval') as mock_start_interval:
-                self.sqlur.activate('tbl1', 'tbl2')
-
-        mock_create_triggers.assert_called_with('tbl1', 'tbl2')
-
-        self.assertEqual(self.sqlur._stack['undo'], [])
-        self.assertEqual(self.sqlur._stack['redo'], [])
-        self.assertEqual(self.sqlur._active, True)
-
-        mock_start_interval.assert_called_with()
-
-    def test_activate_while_active(self):
-        self.assertEqual(self.sqlur._active, False)
-        self.sqlur.activate()
-        self.assertEqual(self.sqlur._active, True)
-
-        with mock.patch.object(self.sqlur, '_create_triggers') as mock_create_triggers:
-            with mock.patch.object(self.sqlur, '_start_interval') as mock_start_interval:
-                self.sqlur.activate()
-
-        mock_create_triggers.assert_not_called()
-        mock_start_interval.assert_not_called()
-        self.assertEqual(self.sqlur._active, True)
-
-    def test_deactivate(self):
-        self.sqlur.activate('tbl1')
-
-        with mock.patch.object(self.sqlur, '_drop_triggers') as mock_drop_triggers:
-            self.sqlur.deactivate()
-
-        mock_drop_triggers.assert_called_with()
-
-        self.assertEqual(self.sqlur._stack['undo'], [])
-        self.assertEqual(self.sqlur._stack['redo'], [])
-        self.assertEqual(self.sqlur._active, False)
-
-    def test_deactivate_while_not_active(self):
-        self.assertEqual(self.sqlur._active, False)
-
-        with mock.patch.object(self.sqlur, '_drop_triggers') as mock_drop_triggers:
-            self.sqlur.deactivate()
-
-        mock_drop_triggers.assert_not_called()
-
     def test_barrier(self):
-        self.sqlur.activate('tbl1')
+        self.sqlur.install('tbl1')
 
         self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (23,))
         self.sqlur.barrier()
@@ -112,7 +53,7 @@ class SQLiteUndoRedoTest(unittest.TestCase):
         self.assertEqual(self.sqlur._stack['undo'], [[1, 1], [2, 2]])
 
     def test_barrier_several_changes(self):
-        self.sqlur.activate('tbl1')
+        self.sqlur.install('tbl1')
 
         self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (23,))
         self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (42,))
@@ -121,23 +62,8 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.assertEqual(self.sqlur._stack['undo'], [[1, 2]])
 
-    def test_barrier_while_not_active(self):
-        self.assertEqual(self.sqlur._active, False)
-
-        with mock.patch.object(self.sqlur, '_db') as mock_db:
-            self.sqlur.barrier()
-
-        mock_db.execute.assert_not_called()
-
-        self.sqlur.activate()
-
-        with mock.patch.object(self.sqlur, '_db') as mock_db:
-            self.sqlur.barrier()
-
-        self.assertEqual(mock_db.execute.call_count, 2)
-
     def test_barrier_after_no_changes(self):
-        self.sqlur.activate('tbl1')
+        self.sqlur.install('tbl1')
 
         self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (23,))
         self.sqlur.barrier()
@@ -154,7 +80,7 @@ class SQLiteUndoRedoTest(unittest.TestCase):
         mock_step.assert_called_with('undo', 'redo')
 
     def test_undo_insert(self):
-        self.sqlur.activate('tbl1')
+        self.sqlur.install('tbl1')
         self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (23,))
         self.sqlur.barrier()
 
@@ -168,7 +94,7 @@ class SQLiteUndoRedoTest(unittest.TestCase):
         self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [])
 
     def test_undo_update(self):
-        self.sqlur.activate('tbl1')
+        self.sqlur.install('tbl1')
         self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (23,))
         self.sqlur.barrier()
         self.test_db.execute("UPDATE tbl1 SET a=? WHERE a=?", (42, 23,))
@@ -184,7 +110,7 @@ class SQLiteUndoRedoTest(unittest.TestCase):
         self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [(23,)])
 
     def test_undo_delete(self):
-        self.sqlur.activate('tbl1')
+        self.sqlur.install('tbl1')
         self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (23,))
         self.sqlur.barrier()
         self.test_db.execute("DELETE FROM tbl1 WHERE a=?", (23,))
@@ -200,7 +126,7 @@ class SQLiteUndoRedoTest(unittest.TestCase):
         self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [(23,)])
 
     def test_undo_several_changes(self):
-        self.sqlur.activate('tbl1')
+        self.sqlur.install('tbl1')
         self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (23,))
         self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (42,))
         self.test_db.execute("UPDATE tbl1 SET a=? WHERE a=?", (69, 42))
@@ -223,7 +149,7 @@ class SQLiteUndoRedoTest(unittest.TestCase):
         mock_step.assert_called_with('redo', 'undo')
 
     def test_redo_insert(self):
-        self.sqlur.activate('tbl1')
+        self.sqlur.install('tbl1')
         self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (23,))
         self.sqlur.barrier()
         self.sqlur.undo()
@@ -238,7 +164,7 @@ class SQLiteUndoRedoTest(unittest.TestCase):
         self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [(23,)])
 
     def test_redo_update(self):
-        self.sqlur.activate('tbl1')
+        self.sqlur.install('tbl1')
         self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (23,))
         self.sqlur.barrier()
         self.test_db.execute("UPDATE tbl1 SET a=? WHERE a=?", (42, 23,))
@@ -255,7 +181,7 @@ class SQLiteUndoRedoTest(unittest.TestCase):
         self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [(42,)])
 
     def test_redo_delete(self):
-        self.sqlur.activate('tbl1')
+        self.sqlur.install('tbl1')
         self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (23,))
         self.sqlur.barrier()
         self.test_db.execute("DELETE FROM tbl1 WHERE a=?", (23,))
@@ -272,7 +198,7 @@ class SQLiteUndoRedoTest(unittest.TestCase):
         self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [])
 
     def test_redo_several_changes(self):
-        self.sqlur.activate('tbl1')
+        self.sqlur.install('tbl1')
         self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (23,))
         self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (42,))
         self.test_db.execute("UPDATE tbl1 SET a=? WHERE a=?", (69, 42))
@@ -291,7 +217,6 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
     def test___init__(self):
         self.assertIs(self.sqlur._db, self.test_db)
-        self.assertEqual(self.sqlur._active, False)
         self.assertEqual(self.sqlur._stack, {'undo': [], 'redo': []})
         self.assertEqual(self.sqlur._firstlog, 1)
 
@@ -299,33 +224,33 @@ class SQLiteUndoRedoTest(unittest.TestCase):
         return db.execute(
             "SELECT name FROM sqlite_temp_schema WHERE type='trigger'").fetchall()
 
-    def test__create_triggers_no_tables(self):
-        self.sqlur._create_triggers()
+    def test_install_no_tables(self):
+        self.sqlur.install()
 
         self.assertEqual(self._get_triggers(self.test_db), [])
 
-    def test__create_triggers_one_table(self):
-        self.sqlur._create_triggers('tbl1')
+    def test_install_one_table(self):
+        self.sqlur.install('tbl1')
 
         self.assertEqual(
             self._get_triggers(self.test_db),
             [('_tbl1_it',), ('_tbl1_ut',), ('_tbl1_dt',)],
         )
 
-    def test__create_triggers_several_tables(self):
-        self.sqlur._create_triggers('tbl1', 'tbl2')
+    def test_install_several_tables(self):
+        self.sqlur.install('tbl1', 'tbl2')
 
         self.assertEqual(len(self._get_triggers(self.test_db)), 6)
 
-    def test__drop_triggers(self):
-        self.sqlur._create_triggers('tbl1', 'tbl2')
+    def test_uninstall(self):
+        self.sqlur.install('tbl1', 'tbl2')
 
-        self.sqlur._drop_triggers()
+        self.sqlur.uninstall('tbl1', 'tbl2')
 
         self.assertEqual(self._get_triggers(self.test_db), [])
 
     def test__start_interval(self):
-        self.sqlur.activate('tbl1')
+        self.sqlur.install('tbl1')
 
         self.sqlur._start_interval()
 
