@@ -90,7 +90,7 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.assertEqual(self.sqlur._stack['undo'], [])
         self.assertEqual(self.sqlur._stack['redo'], [[1, 2]])
-        self.assertEqual(self.sqlur._firstlog, 2)
+        self.assertEqual(self.sqlur._previous_end, 2)
         self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [])
 
     def test_undo_update(self):
@@ -106,7 +106,7 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.assertEqual(self.sqlur._stack['undo'], [[1, 2]])
         self.assertEqual(self.sqlur._stack['redo'], [[2, 3]])
-        self.assertEqual(self.sqlur._firstlog, 3)
+        self.assertEqual(self.sqlur._previous_end, 3)
         self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [(23,)])
 
     def test_undo_delete(self):
@@ -122,7 +122,7 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.assertEqual(self.sqlur._stack['undo'], [[1, 2]])
         self.assertEqual(self.sqlur._stack['redo'], [[2, 3]])
-        self.assertEqual(self.sqlur._firstlog, 3)
+        self.assertEqual(self.sqlur._previous_end, 3)
         self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [(23,)])
 
     def test_undo_several_changes(self):
@@ -139,7 +139,7 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.assertEqual(self.sqlur._stack['undo'], [])
         self.assertEqual(self.sqlur._stack['redo'], [[1, 5]])
-        self.assertEqual(self.sqlur._firstlog, 5)
+        self.assertEqual(self.sqlur._previous_end, 5)
         self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [])
 
     def test_redo(self):
@@ -160,7 +160,7 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.assertEqual(self.sqlur._stack['undo'], [[1, 2]])
         self.assertEqual(self.sqlur._stack['redo'], [])
-        self.assertEqual(self.sqlur._firstlog, 2)
+        self.assertEqual(self.sqlur._previous_end, 2)
         self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [(23,)])
 
     def test_redo_update(self):
@@ -177,7 +177,7 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.assertEqual(self.sqlur._stack['undo'], [[1, 2], [2, 3]])
         self.assertEqual(self.sqlur._stack['redo'], [])
-        self.assertEqual(self.sqlur._firstlog, 3)
+        self.assertEqual(self.sqlur._previous_end, 3)
         self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [(42,)])
 
     def test_redo_delete(self):
@@ -194,7 +194,7 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.assertEqual(self.sqlur._stack['undo'], [[1, 2], [2, 3]])
         self.assertEqual(self.sqlur._stack['redo'], [])
-        self.assertEqual(self.sqlur._firstlog, 3)
+        self.assertEqual(self.sqlur._previous_end, 3)
         self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [])
 
     def test_redo_several_changes(self):
@@ -212,13 +212,13 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.assertEqual(self.sqlur._stack['undo'], [[1, 5]])
         self.assertEqual(self.sqlur._stack['redo'], [])
-        self.assertEqual(self.sqlur._firstlog, 5)
+        self.assertEqual(self.sqlur._previous_end, 5)
         self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [(69,)])
 
     def test___init__(self):
         self.assertIs(self.sqlur._db, self.test_db)
         self.assertEqual(self.sqlur._stack, {'undo': [], 'redo': []})
-        self.assertEqual(self.sqlur._firstlog, 1)
+        self.assertEqual(self.sqlur._previous_end, 1)
 
     def _get_triggers(self, db):
         return db.execute(
@@ -249,18 +249,18 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.assertEqual(self._get_triggers(self.test_db), [])
 
-    def test__get_next_undo_seq(self):
+    def test__get_end(self):
         self.sqlur.install('tbl1')
 
-        self.assertEqual(self.sqlur._get_next_undo_seq(), 1)
+        self.assertEqual(self.sqlur._get_end(), 1)
 
         self.test_db.executemany("INSERT INTO tbl1 VALUES(?)", [(23,), (42,)])
 
-        self.assertEqual(self.sqlur._get_next_undo_seq(), 3)
+        self.assertEqual(self.sqlur._get_end(), 3)
 
         self.sqlur.record_undo_step()
 
-        self.assertEqual(self.sqlur._get_next_undo_seq(), 3)
+        self.assertEqual(self.sqlur._get_end(), 3)
 
 
 if __name__ == '__main__':
