@@ -42,8 +42,8 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         mock_create_triggers.assert_called_with('tbl1')
 
-        self.assertEqual(self.sqlur._undo['undostack'], [])
-        self.assertEqual(self.sqlur._undo['redostack'], [])
+        self.assertEqual(self.sqlur._stack['undo'], [])
+        self.assertEqual(self.sqlur._stack['redo'], [])
         self.assertEqual(self.sqlur._active, True)
 
         mock_start_interval.assert_called_with()
@@ -55,8 +55,8 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         mock_create_triggers.assert_called_with('tbl1', 'tbl2')
 
-        self.assertEqual(self.sqlur._undo['undostack'], [])
-        self.assertEqual(self.sqlur._undo['redostack'], [])
+        self.assertEqual(self.sqlur._stack['undo'], [])
+        self.assertEqual(self.sqlur._stack['redo'], [])
         self.assertEqual(self.sqlur._active, True)
 
         mock_start_interval.assert_called_with()
@@ -82,8 +82,8 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         mock_drop_triggers.assert_called_with()
 
-        self.assertEqual(self.sqlur._undo['undostack'], [])
-        self.assertEqual(self.sqlur._undo['redostack'], [])
+        self.assertEqual(self.sqlur._stack['undo'], [])
+        self.assertEqual(self.sqlur._stack['redo'], [])
         self.assertEqual(self.sqlur._active, False)
 
     def test_deactivate_while_not_active(self):
@@ -99,12 +99,12 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (23,))
         self.sqlur.barrier()
-        self.assertEqual(self.sqlur._undo['undostack'], [[1, 1]])
+        self.assertEqual(self.sqlur._stack['undo'], [[1, 1]])
         self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (42,))
 
         self.sqlur.barrier()
 
-        self.assertEqual(self.sqlur._undo['undostack'], [[1, 1], [2, 2]])
+        self.assertEqual(self.sqlur._stack['undo'], [[1, 1], [2, 2]])
 
     def test_barrier_several_changes(self):
         self.sqlur.activate('tbl1')
@@ -114,7 +114,7 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.sqlur.barrier()
 
-        self.assertEqual(self.sqlur._undo['undostack'], [[1, 2]])
+        self.assertEqual(self.sqlur._stack['undo'], [[1, 2]])
 
     def test_barrier_while_not_active(self):
         self.assertEqual(self.sqlur._active, False)
@@ -136,17 +136,17 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (23,))
         self.sqlur.barrier()
-        self.assertEqual(self.sqlur._undo['undostack'], [[1, 1]])
+        self.assertEqual(self.sqlur._stack['undo'], [[1, 1]])
 
         self.sqlur.barrier()
 
-        self.assertEqual(self.sqlur._undo['undostack'], [[1, 1]])
+        self.assertEqual(self.sqlur._stack['undo'], [[1, 1]])
 
     def test_undo(self):
         with mock.patch.object(self.sqlur, '_step') as mock_step:
             self.sqlur.undo()
 
-        mock_step.assert_called_with('undostack', 'redostack')
+        mock_step.assert_called_with('undo', 'redo')
 
     def test_undo_insert(self):
         self.sqlur.activate('tbl1')
@@ -157,8 +157,8 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.sqlur.undo()
 
-        self.assertEqual(self.sqlur._undo['undostack'], [])
-        self.assertEqual(self.sqlur._undo['redostack'], [[1, 1]])
+        self.assertEqual(self.sqlur._stack['undo'], [])
+        self.assertEqual(self.sqlur._stack['redo'], [[1, 1]])
         self.assertEqual(self.sqlur._firstlog, 2)
         self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [])
 
@@ -173,8 +173,8 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.sqlur.undo()
 
-        self.assertEqual(self.sqlur._undo['undostack'], [[1, 1]])
-        self.assertEqual(self.sqlur._undo['redostack'], [[2, 2]])
+        self.assertEqual(self.sqlur._stack['undo'], [[1, 1]])
+        self.assertEqual(self.sqlur._stack['redo'], [[2, 2]])
         self.assertEqual(self.sqlur._firstlog, 3)
         self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [(23,)])
 
@@ -189,8 +189,8 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.sqlur.undo()
 
-        self.assertEqual(self.sqlur._undo['undostack'], [[1, 1]])
-        self.assertEqual(self.sqlur._undo['redostack'], [[2, 2]])
+        self.assertEqual(self.sqlur._stack['undo'], [[1, 1]])
+        self.assertEqual(self.sqlur._stack['redo'], [[2, 2]])
         self.assertEqual(self.sqlur._firstlog, 3)
         self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [(23,)])
 
@@ -206,8 +206,8 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.sqlur.undo()
 
-        self.assertEqual(self.sqlur._undo['undostack'], [])
-        self.assertEqual(self.sqlur._undo['redostack'], [[1, 4]])
+        self.assertEqual(self.sqlur._stack['undo'], [])
+        self.assertEqual(self.sqlur._stack['redo'], [[1, 4]])
         self.assertEqual(self.sqlur._firstlog, 5)
         self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [])
 
@@ -215,7 +215,7 @@ class SQLiteUndoRedoTest(unittest.TestCase):
         with mock.patch.object(self.sqlur, '_step') as mock_step:
             self.sqlur.redo()
 
-        mock_step.assert_called_with('redostack', 'undostack')
+        mock_step.assert_called_with('redo', 'undo')
 
     def test_redo_insert(self):
         self.sqlur.activate('tbl1')
@@ -227,8 +227,8 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.sqlur.redo()
 
-        self.assertEqual(self.sqlur._undo['undostack'], [[1, 1]])
-        self.assertEqual(self.sqlur._undo['redostack'], [])
+        self.assertEqual(self.sqlur._stack['undo'], [[1, 1]])
+        self.assertEqual(self.sqlur._stack['redo'], [])
         self.assertEqual(self.sqlur._firstlog, 2)
         self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [(23,)])
 
@@ -244,8 +244,8 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.sqlur.redo()
 
-        self.assertEqual(self.sqlur._undo['undostack'], [[1, 1], [2, 2]])
-        self.assertEqual(self.sqlur._undo['redostack'], [])
+        self.assertEqual(self.sqlur._stack['undo'], [[1, 1], [2, 2]])
+        self.assertEqual(self.sqlur._stack['redo'], [])
         self.assertEqual(self.sqlur._firstlog, 3)
         self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [(42,)])
 
@@ -261,8 +261,8 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.sqlur.redo()
 
-        self.assertEqual(self.sqlur._undo['undostack'], [[1, 1], [2, 2]])
-        self.assertEqual(self.sqlur._undo['redostack'], [])
+        self.assertEqual(self.sqlur._stack['undo'], [[1, 1], [2, 2]])
+        self.assertEqual(self.sqlur._stack['redo'], [])
         self.assertEqual(self.sqlur._firstlog, 3)
         self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [])
 
@@ -279,21 +279,15 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.sqlur.redo()
 
-        self.assertEqual(self.sqlur._undo['undostack'], [[1, 4]])
-        self.assertEqual(self.sqlur._undo['redostack'], [])
+        self.assertEqual(self.sqlur._stack['undo'], [[1, 4]])
+        self.assertEqual(self.sqlur._stack['redo'], [])
         self.assertEqual(self.sqlur._firstlog, 5)
         self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [(69,)])
 
     def test___init__(self):
         self.assertIs(self.sqlur._db, self.test_db)
         self.assertEqual(self.sqlur._active, False)
-        self.assertEqual(
-            self.sqlur._undo,
-            {
-                'undostack': [],
-                'redostack': [],
-            },
-        )
+        self.assertEqual(self.sqlur._stack, {'undo': [], 'redo': []})
         self.assertEqual(self.sqlur._firstlog, 1)
 
     def _get_triggers(self, db):

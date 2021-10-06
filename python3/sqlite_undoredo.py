@@ -27,26 +27,23 @@ if sys.version_info < (3, 6):
 class SQLiteUndoRedo:
 
     def activate(self, *args):
-        _undo = self._undo
         if self._active:
             return
         self._create_triggers(*args)
-        _undo['undostack'] = []
-        _undo['redostack'] = []
+        self._stack['undo'] = []
+        self._stack['redo'] = []
         self._active = True
         self._start_interval()
 
     def deactivate(self):
-        _undo = self._undo
         if not self._active:
             return
         self._drop_triggers()
-        _undo['undostack'] = []
-        _undo['redostack'] = []
+        self._stack['undo'] = []
+        self._stack['redo'] = []
         self._active = False
 
     def barrier(self):
-        _undo = self._undo
         if not self._active:
             return
         end = self._db.execute("SELECT coalesce(max(seq),0) FROM undolog").fetchone()[0]
@@ -54,22 +51,20 @@ class SQLiteUndoRedo:
         self._start_interval()
         if begin == self._firstlog:
             return
-        _undo['undostack'].append([begin, end])
-        _undo['redostack'] = []
+        self._stack['undo'].append([begin, end])
+        self._stack['redo'] = []
 
     def undo(self):
-        self._step('undostack', 'redostack')
+        self._step('undo', 'redo')
 
     def redo(self):
-        self._step('redostack', 'undostack')
+        self._step('redo', 'undo')
 
     def __init__(self, db):
         self._db = db
 
         self._active = False
-        self._undo = {}
-        self._undo['undostack'] = []
-        self._undo['redostack'] = []
+        self._stack = {'undo': [], 'redo': []}
         self._firstlog = 1
 
     def _create_triggers(self, *args):
@@ -118,14 +113,12 @@ class SQLiteUndoRedo:
             pass
 
     def _start_interval(self):
-        _undo = self._undo
         self._firstlog = self._db.execute(
             "SELECT coalesce(max(seq),0)+1 FROM undolog").fetchone()[0]
 
     def _step(self, v1, v2):
-        _undo = self._undo
-        op = _undo[v1][-1]
-        _undo[v1] = _undo[v1][0:-1]
+        op = self._stack[v1][-1]
+        self._stack[v1] = self._stack[v1][0:-1]
         (begin, end) = op
         self._db.execute('BEGIN')
         q1 = f"SELECT sql FROM undolog WHERE seq>={begin} AND seq<={end}" \
@@ -140,5 +133,5 @@ class SQLiteUndoRedo:
 
         end = self._db.execute("SELECT coalesce(max(seq),0) FROM undolog").fetchone()[0]
         begin = self._firstlog
-        _undo[v2].append([begin, end])
+        self._stack[v2].append([begin, end])
         self._start_interval()
