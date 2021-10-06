@@ -40,7 +40,7 @@ class SQLiteUndoRedoTest(unittest.TestCase):
             with mock.patch.object(self.sqlur, '_start_interval') as mock_start_interval:
                 self.sqlur.activate('tbl1')
 
-        mock_create_triggers.assert_called_with(self.test_db, 'tbl1')
+        mock_create_triggers.assert_called_with('tbl1')
 
         self.assertEqual(self.sqlur._undo['undostack'], [])
         self.assertEqual(self.sqlur._undo['redostack'], [])
@@ -54,7 +54,7 @@ class SQLiteUndoRedoTest(unittest.TestCase):
             with mock.patch.object(self.sqlur, '_start_interval') as mock_start_interval:
                 self.sqlur.activate('tbl1', 'tbl2')
 
-        mock_create_triggers.assert_called_with(self.test_db, 'tbl1', 'tbl2')
+        mock_create_triggers.assert_called_with('tbl1', 'tbl2')
 
         self.assertEqual(self.sqlur._undo['undostack'], [])
         self.assertEqual(self.sqlur._undo['redostack'], [])
@@ -82,7 +82,7 @@ class SQLiteUndoRedoTest(unittest.TestCase):
         with mock.patch.object(self.sqlur, '_drop_triggers') as mock_drop_triggers:
             self.sqlur.deactivate()
 
-        mock_drop_triggers.assert_called_with(self.test_db)
+        mock_drop_triggers.assert_called_with()
 
         self.assertEqual(self.sqlur._undo['undostack'], [])
         self.assertEqual(self.sqlur._undo['redostack'], [])
@@ -396,15 +396,15 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
     def _get_triggers(self, db):
         return db.execute(
-            "SELECT name FROM sqlite_temp_master WHERE type='trigger'").fetchall()
+            "SELECT name FROM sqlite_temp_schema WHERE type='trigger'").fetchall()
 
     def test__create_triggers_no_tables(self):
-        self.sqlur._create_triggers(self.test_db)
+        self.sqlur._create_triggers()
 
         self.assertEqual(self._get_triggers(self.test_db), [])
 
     def test__create_triggers_one_table(self):
-        self.sqlur._create_triggers(self.test_db, 'tbl1')
+        self.sqlur._create_triggers('tbl1')
 
         self.assertEqual(
             self._get_triggers(self.test_db),
@@ -412,14 +412,14 @@ class SQLiteUndoRedoTest(unittest.TestCase):
         )
 
     def test__create_triggers_several_tables(self):
-        self.sqlur._create_triggers(self.test_db, 'tbl1', 'tbl2')
+        self.sqlur._create_triggers('tbl1', 'tbl2')
 
         self.assertEqual(len(self._get_triggers(self.test_db)), 6)
 
     def test__drop_triggers(self):
-        self.sqlur._create_triggers(self.test_db, 'tbl1', 'tbl2')
+        self.sqlur._create_triggers('tbl1', 'tbl2')
 
-        self.sqlur._drop_triggers(self.test_db)
+        self.sqlur._drop_triggers()
 
         self.assertEqual(self._get_triggers(self.test_db), [])
 
