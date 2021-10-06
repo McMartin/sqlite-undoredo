@@ -27,12 +27,11 @@ if sys.version_info < (3, 6):
 class SQLiteUndoRedo:
 
     def barrier(self):
-        end = self._get_last_undo_seq()
         begin = self._firstlog
         self._firstlog = self._get_next_undo_seq()
         if begin == self._firstlog:
             return
-        self._stack['undo'].append([begin, end])
+        self._stack['undo'].append([begin, self._get_last_undo_seq()])
         self._stack['redo'] = []
 
     def undo(self):
@@ -106,7 +105,5 @@ class SQLiteUndoRedo:
             self._db.execute(sql)
         self._db.execute('COMMIT')
 
-        end = self._get_last_undo_seq()
-        begin = self._firstlog
-        self._stack[v2].append([begin, end])
+        self._stack[v2].append([self._firstlog, self._get_last_undo_seq()])
         self._firstlog = self._get_next_undo_seq()
