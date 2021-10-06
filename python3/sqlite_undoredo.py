@@ -26,20 +26,6 @@ if sys.version_info < (3, 6):
 
 class SQLiteUndoRedo:
 
-    def record_undo_step(self):
-        begin = self._firstlog
-        self._firstlog = self._get_next_undo_seq()
-        if begin == self._firstlog:
-            return
-        self._stack['undo'].append([begin, self._get_next_undo_seq()])
-        self._stack['redo'] = []
-
-    def undo(self):
-        self._step('undo', 'redo')
-
-    def redo(self):
-        self._step('redo', 'undo')
-
     def __init__(self, db):
         self._db = db
 
@@ -90,17 +76,33 @@ class SQLiteUndoRedo:
         return self._db.execute(
             "SELECT coalesce(max(seq),0)+1 FROM undo_actions").fetchone()[0]
 
-    def _step(self, v1, v2):
-        (begin, end) = self._stack[v1].pop()
+    def record_undo_step(self):
+        begin = self._firstlog
+        end = self._get_next_undo_seq()
+        if begin == end:
+            return
+        self._stack['undo'].append([begin, end])
+        self._stack['redo'] = []
+        self._firstlog = end
+
+    def _step(self, lhs, rhs):
+        (begin, end) = self._stack[lhs].pop()
         self._db.execute('BEGIN')
         q1 = f"SELECT sql FROM undo_actions WHERE seq>={begin} AND seq<{end}" \
              " ORDER BY seq DESC"
         sqllist = self._db.execute(q1).fetchall()
         self._db.execute(f"DELETE FROM undo_actions WHERE seq>={begin} AND seq<{end}")
-        self._firstlog = self._get_next_undo_seq()
+        rhs_begin = self._get_next_undo_seq()
         for (sql,) in sqllist:
             self._db.execute(sql)
         self._db.execute('COMMIT')
 
-        self._stack[v2].append([self._firstlog, self._get_next_undo_seq()])
-        self._firstlog = self._get_next_undo_seq()
+        rhs_end = self._get_next_undo_seq()
+        self._stack[rhs].append([rhs_begin, rhs_end])
+        self._firstlog = rhs_end
+
+    def undo(self):
+        self._step('undo', 'redo')
+
+    def redo(self):
+        self._step('redo', 'undo')
