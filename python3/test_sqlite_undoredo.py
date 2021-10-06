@@ -33,6 +33,11 @@ class SQLiteUndoRedoTest(unittest.TestCase):
         self.sqlur = SQLiteUndoRedo(self.test_db)
 
     def tearDown(self):
+        try:
+            self.test_db.execute("DROP TABLE undolog")
+        except apsw.SQLError:
+            pass
+
         self.db_connection.close()
 
     def test_activate_one_table(self):

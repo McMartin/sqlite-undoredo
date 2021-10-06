@@ -63,16 +63,17 @@ class SQLiteUndoRedo:
     def __init__(self, db):
         self._db = db
 
-        self._active = False
-        self._stack = {'undo': [], 'redo': []}
-        self._firstlog = 1
-
-    def _create_triggers(self, *args):
         try:
             self._db.execute("DROP TABLE undolog")
         except apsw.SQLError:
             pass
         self._db.execute("CREATE TEMP TABLE undolog(seq integer primary key, sql text)")
+
+        self._active = False
+        self._stack = {'undo': [], 'redo': []}
+        self._firstlog = 1
+
+    def _create_triggers(self, *args):
         for tbl in args:
             collist = self._db.execute(f"pragma table_info({tbl})").fetchall()
             sql = f"CREATE TEMP TRIGGER _{tbl}_it AFTER INSERT ON {tbl} BEGIN\n"
@@ -107,10 +108,6 @@ class SQLiteUndoRedo:
             if not re.match("_.*_(i|u|d)t$", trigger):
                 continue
             self._db.execute(f"DROP TRIGGER {trigger};")
-        try:
-            self._db.execute("DROP TABLE undolog")
-        except apsw.SQLError:
-            pass
 
     def _start_interval(self):
         self._firstlog = self._db.execute(
