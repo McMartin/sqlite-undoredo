@@ -29,7 +29,7 @@ class SQLiteUndoRedo:
     def barrier(self):
         end = self._db.execute("SELECT coalesce(max(seq),0) FROM undolog").fetchone()[0]
         begin = self._firstlog
-        self._start_interval()
+        self._firstlog = self._get_next_undo_seq()
         if begin == self._firstlog:
             return
         self._stack['undo'].append([begin, end])
@@ -51,7 +51,7 @@ class SQLiteUndoRedo:
         self._db.execute("CREATE TEMP TABLE undolog(seq integer primary key, sql text)")
 
         self._stack = {'undo': [], 'redo': []}
-        self._start_interval()
+        self._firstlog = 1
 
     def install(self, *args):
         for tbl in args:
@@ -87,8 +87,8 @@ class SQLiteUndoRedo:
             self._db.execute(f"DROP TRIGGER IF EXISTS _{tbl}_ut")
             self._db.execute(f"DROP TRIGGER IF EXISTS _{tbl}_dt")
 
-    def _start_interval(self):
-        self._firstlog = self._db.execute(
+    def _get_next_undo_seq(self):
+        return self._db.execute(
             "SELECT coalesce(max(seq),0)+1 FROM undolog").fetchone()[0]
 
     def _step(self, v1, v2):
@@ -98,8 +98,7 @@ class SQLiteUndoRedo:
              " ORDER BY seq DESC"
         sqllist = self._db.execute(q1).fetchall()
         self._db.execute(f"DELETE FROM undolog WHERE seq>={begin} AND seq<={end}")
-        self._firstlog = self._db.execute(
-            "SELECT coalesce(max(seq),0)+1 FROM undolog").fetchone()[0]
+        self._firstlog = self._get_next_undo_seq()
         for (sql,) in sqllist:
             self._db.execute(sql)
         self._db.execute('COMMIT')
@@ -107,4 +106,4 @@ class SQLiteUndoRedo:
         end = self._db.execute("SELECT coalesce(max(seq),0) FROM undolog").fetchone()[0]
         begin = self._firstlog
         self._stack[v2].append([begin, end])
-        self._start_interval()
+        self._firstlog = self._get_next_undo_seq()
