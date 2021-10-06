@@ -92,9 +92,7 @@ class SQLiteUndoRedo:
             "SELECT coalesce(max(seq),0)+1 FROM undolog").fetchone()[0]
 
     def _step(self, v1, v2):
-        op = self._stack[v1][-1]
-        self._stack[v1] = self._stack[v1][0:-1]
-        (begin, end) = op
+        (begin, end) = self._stack[v1].pop()
         self._db.execute('BEGIN')
         q1 = f"SELECT sql FROM undolog WHERE seq>={begin} AND seq<={end}" \
              " ORDER BY seq DESC"
