@@ -44,10 +44,10 @@ class SQLiteUndoRedo:
         self._db = db
 
         try:
-            self._db.execute("DROP TABLE undolog")
+            self._db.execute("DROP TABLE undo_actions")
         except apsw.SQLError:
             pass
-        self._db.execute("CREATE TEMP TABLE undolog(seq integer primary key, sql text)")
+        self._db.execute("CREATE TEMP TABLE undo_actions(seq integer primary key, sql text)")
 
         self._stack = {'undo': [], 'redo': []}
         self._firstlog = 1
@@ -56,11 +56,11 @@ class SQLiteUndoRedo:
         for tbl in args:
             collist = self._db.execute(f"pragma table_info({tbl})").fetchall()
             sql = f"CREATE TEMP TRIGGER _{tbl}_it AFTER INSERT ON {tbl} BEGIN\n"
-            sql += "  INSERT INTO undolog VALUES(NULL,"
+            sql += "  INSERT INTO undo_actions VALUES(NULL,"
             sql += f"'DELETE FROM {tbl} WHERE rowid='||new.rowid);\nEND;\n"
 
             sql += f"CREATE TEMP TRIGGER _{tbl}_ut AFTER UPDATE ON {tbl} BEGIN\n"
-            sql += "  INSERT INTO undolog VALUES(NULL,"
+            sql += "  INSERT INTO undo_actions VALUES(NULL,"
             sql += f"'UPDATE {tbl} "
             sep = "SET "
             for (x1, name, x2, x3, x4, x5) in collist:
@@ -69,7 +69,7 @@ class SQLiteUndoRedo:
             sql += " WHERE rowid='||old.rowid);\nEND;\n"
 
             sql += f"CREATE TEMP TRIGGER _{tbl}_dt BEFORE DELETE ON {tbl} BEGIN\n"
-            sql += "  INSERT INTO undolog VALUES(NULL,"
+            sql += "  INSERT INTO undo_actions VALUES(NULL,"
             sql += f"'INSERT INTO {tbl}(rowid"
             for (x1, name, x2, x3, x4, x5) in collist:
                 sql += f",{name}"
@@ -87,19 +87,20 @@ class SQLiteUndoRedo:
             self._db.execute(f"DROP TRIGGER IF EXISTS _{tbl}_dt")
 
     def _get_last_undo_seq(self):
-        return self._db.execute("SELECT coalesce(max(seq),0) FROM undolog").fetchone()[0]
+        return self._db.execute(
+            "SELECT coalesce(max(seq),0) FROM undo_actions").fetchone()[0]
 
     def _get_next_undo_seq(self):
         return self._db.execute(
-            "SELECT coalesce(max(seq),0)+1 FROM undolog").fetchone()[0]
+            "SELECT coalesce(max(seq),0)+1 FROM undo_actions").fetchone()[0]
 
     def _step(self, v1, v2):
         (begin, end) = self._stack[v1].pop()
         self._db.execute('BEGIN')
-        q1 = f"SELECT sql FROM undolog WHERE seq>={begin} AND seq<={end}" \
+        q1 = f"SELECT sql FROM undo_actions WHERE seq>={begin} AND seq<={end}" \
              " ORDER BY seq DESC"
         sqllist = self._db.execute(q1).fetchall()
-        self._db.execute(f"DELETE FROM undolog WHERE seq>={begin} AND seq<={end}")
+        self._db.execute(f"DELETE FROM undo_actions WHERE seq>={begin} AND seq<={end}")
         self._firstlog = self._get_next_undo_seq()
         for (sql,) in sqllist:
             self._db.execute(sql)
