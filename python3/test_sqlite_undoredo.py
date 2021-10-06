@@ -292,9 +292,7 @@ class SQLiteUndoRedoTest(unittest.TestCase):
                 'active': 0,
                 'undostack': [],
                 'redostack': [],
-                'pending': [],
                 'firstlog': 1,
-                'startstate': [],
             },
         )
 

@@ -47,7 +47,6 @@ class SQLiteUndoRedo:
 
     def barrier(self):
         _undo = self._undo
-        _undo['pending'] = []
         if not _undo['active']:
             return
         end = self._db.execute("SELECT coalesce(max(seq),0) FROM undolog").fetchone()[0]
@@ -71,9 +70,7 @@ class SQLiteUndoRedo:
         self._undo['active'] = 0
         self._undo['undostack'] = []
         self._undo['redostack'] = []
-        self._undo['pending'] = []
         self._undo['firstlog'] = 1
-        self._undo['startstate'] = []
 
     def _create_triggers(self, *args):
         try:
