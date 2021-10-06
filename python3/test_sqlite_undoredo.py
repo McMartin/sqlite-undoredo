@@ -44,7 +44,7 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.assertEqual(self.sqlur._undo['undostack'], [])
         self.assertEqual(self.sqlur._undo['redostack'], [])
-        self.assertEqual(self.sqlur._undo['active'], 1)
+        self.assertEqual(self.sqlur._active, True)
 
         mock_start_interval.assert_called_with()
 
@@ -57,14 +57,14 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.assertEqual(self.sqlur._undo['undostack'], [])
         self.assertEqual(self.sqlur._undo['redostack'], [])
-        self.assertEqual(self.sqlur._undo['active'], 1)
+        self.assertEqual(self.sqlur._active, True)
 
         mock_start_interval.assert_called_with()
 
     def test_activate_while_active(self):
-        self.assertEqual(self.sqlur._undo['active'], 0)
+        self.assertEqual(self.sqlur._active, False)
         self.sqlur.activate()
-        self.assertEqual(self.sqlur._undo['active'], 1)
+        self.assertEqual(self.sqlur._active, True)
 
         with mock.patch.object(self.sqlur, '_create_triggers') as mock_create_triggers:
             with mock.patch.object(self.sqlur, '_start_interval') as mock_start_interval:
@@ -72,7 +72,7 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         mock_create_triggers.assert_not_called()
         mock_start_interval.assert_not_called()
-        self.assertEqual(self.sqlur._undo['active'], 1)
+        self.assertEqual(self.sqlur._active, True)
 
     def test_deactivate(self):
         self.sqlur.activate('tbl1')
@@ -84,10 +84,10 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.assertEqual(self.sqlur._undo['undostack'], [])
         self.assertEqual(self.sqlur._undo['redostack'], [])
-        self.assertEqual(self.sqlur._undo['active'], 0)
+        self.assertEqual(self.sqlur._active, False)
 
     def test_deactivate_while_not_active(self):
-        self.assertEqual(self.sqlur._undo['active'], 0)
+        self.assertEqual(self.sqlur._active, False)
 
         with mock.patch.object(self.sqlur, '_drop_triggers') as mock_drop_triggers:
             self.sqlur.deactivate()
@@ -117,7 +117,7 @@ class SQLiteUndoRedoTest(unittest.TestCase):
         self.assertEqual(self.sqlur._undo['undostack'], [[1, 2]])
 
     def test_barrier_while_not_active(self):
-        self.assertEqual(self.sqlur._undo['active'], 0)
+        self.assertEqual(self.sqlur._active, False)
 
         with mock.patch.object(self.sqlur, '_db') as mock_db:
             self.sqlur.barrier()
@@ -286,10 +286,10 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
     def test___init__(self):
         self.assertIs(self.sqlur._db, self.test_db)
+        self.assertEqual(self.sqlur._active, False)
         self.assertEqual(
             self.sqlur._undo,
             {
-                'active': 0,
                 'undostack': [],
                 'redostack': [],
                 'firstlog': 1,

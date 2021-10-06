@@ -28,26 +28,26 @@ class SQLiteUndoRedo:
 
     def activate(self, *args):
         _undo = self._undo
-        if _undo['active']:
+        if self._active:
             return
         self._create_triggers(*args)
         _undo['undostack'] = []
         _undo['redostack'] = []
-        _undo['active'] = 1
+        self._active = True
         self._start_interval()
 
     def deactivate(self):
         _undo = self._undo
-        if not _undo['active']:
+        if not self._active:
             return
         self._drop_triggers()
         _undo['undostack'] = []
         _undo['redostack'] = []
-        _undo['active'] = 0
+        self._active = False
 
     def barrier(self):
         _undo = self._undo
-        if not _undo['active']:
+        if not self._active:
             return
         end = self._db.execute("SELECT coalesce(max(seq),0) FROM undolog").fetchone()[0]
         begin = _undo['firstlog']
@@ -66,8 +66,8 @@ class SQLiteUndoRedo:
     def __init__(self, db):
         self._db = db
 
+        self._active = False
         self._undo = {}
-        self._undo['active'] = 0
         self._undo['undostack'] = []
         self._undo['redostack'] = []
         self._undo['firstlog'] = 1
