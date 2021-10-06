@@ -26,7 +26,7 @@ if sys.version_info < (3, 6):
 
 class SQLiteUndoRedo:
 
-    def barrier(self):
+    def record_undo_step(self):
         begin = self._firstlog
         self._firstlog = self._get_next_undo_seq()
         if begin == self._firstlog:

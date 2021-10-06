@@ -40,36 +40,36 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.db_connection.close()
 
-    def test_barrier(self):
+    def test_record_undo_step(self):
         self.sqlur.install('tbl1')
 
         self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (23,))
-        self.sqlur.barrier()
+        self.sqlur.record_undo_step()
         self.assertEqual(self.sqlur._stack['undo'], [[1, 1]])
         self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (42,))
 
-        self.sqlur.barrier()
+        self.sqlur.record_undo_step()
 
         self.assertEqual(self.sqlur._stack['undo'], [[1, 1], [2, 2]])
 
-    def test_barrier_several_changes(self):
+    def test_record_undo_step_several_changes(self):
         self.sqlur.install('tbl1')
 
         self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (23,))
         self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (42,))
 
-        self.sqlur.barrier()
+        self.sqlur.record_undo_step()
 
         self.assertEqual(self.sqlur._stack['undo'], [[1, 2]])
 
-    def test_barrier_after_no_changes(self):
+    def test_record_undo_step_after_no_changes(self):
         self.sqlur.install('tbl1')
 
         self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (23,))
-        self.sqlur.barrier()
+        self.sqlur.record_undo_step()
         self.assertEqual(self.sqlur._stack['undo'], [[1, 1]])
 
-        self.sqlur.barrier()
+        self.sqlur.record_undo_step()
 
         self.assertEqual(self.sqlur._stack['undo'], [[1, 1]])
 
@@ -82,7 +82,7 @@ class SQLiteUndoRedoTest(unittest.TestCase):
     def test_undo_insert(self):
         self.sqlur.install('tbl1')
         self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (23,))
-        self.sqlur.barrier()
+        self.sqlur.record_undo_step()
 
         self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [(23,)])
 
@@ -96,9 +96,9 @@ class SQLiteUndoRedoTest(unittest.TestCase):
     def test_undo_update(self):
         self.sqlur.install('tbl1')
         self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (23,))
-        self.sqlur.barrier()
+        self.sqlur.record_undo_step()
         self.test_db.execute("UPDATE tbl1 SET a=? WHERE a=?", (42, 23,))
-        self.sqlur.barrier()
+        self.sqlur.record_undo_step()
 
         self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [(42,)])
 
@@ -112,9 +112,9 @@ class SQLiteUndoRedoTest(unittest.TestCase):
     def test_undo_delete(self):
         self.sqlur.install('tbl1')
         self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (23,))
-        self.sqlur.barrier()
+        self.sqlur.record_undo_step()
         self.test_db.execute("DELETE FROM tbl1 WHERE a=?", (23,))
-        self.sqlur.barrier()
+        self.sqlur.record_undo_step()
 
         self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [])
 
@@ -131,7 +131,7 @@ class SQLiteUndoRedoTest(unittest.TestCase):
         self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (42,))
         self.test_db.execute("UPDATE tbl1 SET a=? WHERE a=?", (69, 42))
         self.test_db.execute("DELETE FROM tbl1 WHERE a=?", (23,))
-        self.sqlur.barrier()
+        self.sqlur.record_undo_step()
 
         self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [(69,)])
 
@@ -151,7 +151,7 @@ class SQLiteUndoRedoTest(unittest.TestCase):
     def test_redo_insert(self):
         self.sqlur.install('tbl1')
         self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (23,))
-        self.sqlur.barrier()
+        self.sqlur.record_undo_step()
         self.sqlur.undo()
 
         self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [])
@@ -166,9 +166,9 @@ class SQLiteUndoRedoTest(unittest.TestCase):
     def test_redo_update(self):
         self.sqlur.install('tbl1')
         self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (23,))
-        self.sqlur.barrier()
+        self.sqlur.record_undo_step()
         self.test_db.execute("UPDATE tbl1 SET a=? WHERE a=?", (42, 23,))
-        self.sqlur.barrier()
+        self.sqlur.record_undo_step()
         self.sqlur.undo()
 
         self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [(23,)])
@@ -183,9 +183,9 @@ class SQLiteUndoRedoTest(unittest.TestCase):
     def test_redo_delete(self):
         self.sqlur.install('tbl1')
         self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (23,))
-        self.sqlur.barrier()
+        self.sqlur.record_undo_step()
         self.test_db.execute("DELETE FROM tbl1 WHERE a=?", (23,))
-        self.sqlur.barrier()
+        self.sqlur.record_undo_step()
         self.sqlur.undo()
 
         self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [(23,)])
@@ -203,7 +203,7 @@ class SQLiteUndoRedoTest(unittest.TestCase):
         self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (42,))
         self.test_db.execute("UPDATE tbl1 SET a=? WHERE a=?", (69, 42))
         self.test_db.execute("DELETE FROM tbl1 WHERE a=?", (23,))
-        self.sqlur.barrier()
+        self.sqlur.record_undo_step()
         self.sqlur.undo()
 
         self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [])
@@ -258,7 +258,7 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.assertEqual(self.sqlur._get_last_undo_seq(), 2)
 
-        self.sqlur.barrier()
+        self.sqlur.record_undo_step()
 
         self.assertEqual(self.sqlur._get_next_undo_seq(), 3)
 
@@ -271,7 +271,7 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.assertEqual(self.sqlur._get_next_undo_seq(), 3)
 
-        self.sqlur.barrier()
+        self.sqlur.record_undo_step()
 
         self.assertEqual(self.sqlur._get_next_undo_seq(), 3)
 
