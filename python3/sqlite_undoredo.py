@@ -27,7 +27,7 @@ if sys.version_info < (3, 6):
 class SQLiteUndoRedo:
 
     def barrier(self):
-        end = self._db.execute("SELECT coalesce(max(seq),0) FROM undolog").fetchone()[0]
+        end = self._get_last_undo_seq()
         begin = self._firstlog
         self._firstlog = self._get_next_undo_seq()
         if begin == self._firstlog:
@@ -87,6 +87,9 @@ class SQLiteUndoRedo:
             self._db.execute(f"DROP TRIGGER IF EXISTS _{tbl}_ut")
             self._db.execute(f"DROP TRIGGER IF EXISTS _{tbl}_dt")
 
+    def _get_last_undo_seq(self):
+        return self._db.execute("SELECT coalesce(max(seq),0) FROM undolog").fetchone()[0]
+
     def _get_next_undo_seq(self):
         return self._db.execute(
             "SELECT coalesce(max(seq),0)+1 FROM undolog").fetchone()[0]
@@ -103,7 +106,7 @@ class SQLiteUndoRedo:
             self._db.execute(sql)
         self._db.execute('COMMIT')
 
-        end = self._db.execute("SELECT coalesce(max(seq),0) FROM undolog").fetchone()[0]
+        end = self._get_last_undo_seq()
         begin = self._firstlog
         self._stack[v2].append([begin, end])
         self._firstlog = self._get_next_undo_seq()

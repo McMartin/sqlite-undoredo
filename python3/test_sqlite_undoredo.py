@@ -249,6 +249,19 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.assertEqual(self._get_triggers(self.test_db), [])
 
+    def test__get_last_undo_seq(self):
+        self.sqlur.install('tbl1')
+
+        self.assertEqual(self.sqlur._get_last_undo_seq(), 0)
+
+        self.test_db.executemany("INSERT INTO tbl1 VALUES(?)", [(23,), (42,)])
+
+        self.assertEqual(self.sqlur._get_last_undo_seq(), 2)
+
+        self.sqlur.barrier()
+
+        self.assertEqual(self.sqlur._get_next_undo_seq(), 3)
+
     def test__get_next_undo_seq(self):
         self.sqlur.install('tbl1')
 
