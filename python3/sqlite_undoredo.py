@@ -33,36 +33,37 @@ class SQLiteUndoHistory:
             self._cursor.execute("DROP TABLE undo_actions")
         except apsw.SQLError:
             pass
-        self._cursor.execute("CREATE TEMP TABLE undo_actions(sql text)")
+        self._cursor.execute("CREATE TEMP TABLE undo_actions(sql TEXT)")
 
         self._stack = {'undo': [], 'redo': []}
         self._previous_end = 1
 
     def install(self, *args):
         for tbl in args:
-            collist = self._cursor.execute(f"pragma table_info({tbl})").fetchall()
-            sql = f"CREATE TEMP TRIGGER _{tbl}_it AFTER INSERT ON {tbl} BEGIN\n"
-            sql += "  INSERT INTO undo_actions VALUES("
-            sql += f"'DELETE FROM {tbl} WHERE rowid='||new.rowid);\nEND;\n"
+            column_names = [
+                column[1]
+                for column in self._cursor.execute(f"pragma table_info({tbl})").fetchall()
+            ]
 
-            sql += f"CREATE TEMP TRIGGER _{tbl}_ut AFTER UPDATE ON {tbl} BEGIN\n"
-            sql += "  INSERT INTO undo_actions VALUES("
-            sql += f"'UPDATE {tbl} "
-            sep = "SET "
-            for (x1, name, x2, x3, x4, x5) in collist:
-                sql += f"{sep}{name}='||quote(old.{name})||'"
-                sep = ","
-            sql += " WHERE rowid='||old.rowid);\nEND;\n"
+            sql = f"""
+            CREATE TEMP TRIGGER _{tbl}_it AFTER INSERT ON {tbl} BEGIN
+                INSERT INTO undo_actions VALUES(
+                    'DELETE FROM {tbl} WHERE rowid='||NEW.rowid
+                );
+            END;
 
-            sql += f"CREATE TEMP TRIGGER _{tbl}_dt BEFORE DELETE ON {tbl} BEGIN\n"
-            sql += "  INSERT INTO undo_actions VALUES("
-            sql += f"'INSERT INTO {tbl}(rowid"
-            for (x1, name, x2, x3, x4, x5) in collist:
-                sql += f",{name}"
-            sql += ") VALUES('||old.rowid||'"
-            for (x1, name, x2, x3, x4, x5) in collist:
-                sql += f",'||quote(old.{name})||'"
-            sql += ")');\nEND;\n"
+            CREATE TEMP TRIGGER _{tbl}_ut AFTER UPDATE ON {tbl} BEGIN
+                INSERT INTO undo_actions VALUES(
+                    'UPDATE {tbl} SET {", ".join([f"{name}='||quote(OLD.{name})||'" for name in column_names])} WHERE rowid='||OLD.rowid
+                );
+            END;
+
+            CREATE TEMP TRIGGER _{tbl}_dt AFTER DELETE ON {tbl} BEGIN
+                INSERT INTO undo_actions VALUES(
+                    'INSERT INTO {tbl} (rowid{"".join([f", {name}" for name in column_names])}) VALUES('||OLD.rowid||'{"".join([f", '||quote(OLD.{name})||'" for name in column_names])})'
+                );
+            END;
+            """
 
             self._cursor.execute(sql)
 
