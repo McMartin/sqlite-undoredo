@@ -33,7 +33,7 @@ class SQLiteUndoHistory:
             self._cursor.execute("DROP TABLE undo_actions")
         except apsw.SQLError:
             pass
-        self._cursor.execute("CREATE TEMP TABLE undo_actions(seq integer primary key, sql text)")
+        self._cursor.execute("CREATE TEMP TABLE undo_actions(sql text)")
 
         self._stack = {'undo': [], 'redo': []}
         self._previous_end = 1
@@ -42,11 +42,11 @@ class SQLiteUndoHistory:
         for tbl in args:
             collist = self._cursor.execute(f"pragma table_info({tbl})").fetchall()
             sql = f"CREATE TEMP TRIGGER _{tbl}_it AFTER INSERT ON {tbl} BEGIN\n"
-            sql += "  INSERT INTO undo_actions VALUES(NULL,"
+            sql += "  INSERT INTO undo_actions VALUES("
             sql += f"'DELETE FROM {tbl} WHERE rowid='||new.rowid);\nEND;\n"
 
             sql += f"CREATE TEMP TRIGGER _{tbl}_ut AFTER UPDATE ON {tbl} BEGIN\n"
-            sql += "  INSERT INTO undo_actions VALUES(NULL,"
+            sql += "  INSERT INTO undo_actions VALUES("
             sql += f"'UPDATE {tbl} "
             sep = "SET "
             for (x1, name, x2, x3, x4, x5) in collist:
@@ -55,7 +55,7 @@ class SQLiteUndoHistory:
             sql += " WHERE rowid='||old.rowid);\nEND;\n"
 
             sql += f"CREATE TEMP TRIGGER _{tbl}_dt BEFORE DELETE ON {tbl} BEGIN\n"
-            sql += "  INSERT INTO undo_actions VALUES(NULL,"
+            sql += "  INSERT INTO undo_actions VALUES("
             sql += f"'INSERT INTO {tbl}(rowid"
             for (x1, name, x2, x3, x4, x5) in collist:
                 sql += f",{name}"
@@ -74,7 +74,7 @@ class SQLiteUndoHistory:
 
     def _get_end(self):
         return self._cursor.execute(
-            "SELECT coalesce(max(seq),0)+1 FROM undo_actions").fetchone()[0]
+            "SELECT coalesce(max(rowid),0)+1 FROM undo_actions").fetchone()[0]
 
     def record_undo_step(self):
         begin = self._previous_end
@@ -88,10 +88,10 @@ class SQLiteUndoHistory:
     def _step(self, lhs, rhs):
         (begin, end) = self._stack[lhs].pop()
         self._cursor.execute('BEGIN')
-        q1 = f"SELECT sql FROM undo_actions WHERE seq>={begin} AND seq<{end}" \
-             " ORDER BY seq DESC"
+        q1 = f"SELECT sql FROM undo_actions WHERE rowid>={begin} AND rowid<{end}" \
+             " ORDER BY rowid DESC"
         sqllist = self._cursor.execute(q1).fetchall()
-        self._cursor.execute(f"DELETE FROM undo_actions WHERE seq>={begin} AND seq<{end}")
+        self._cursor.execute(f"DELETE FROM undo_actions WHERE rowid>={begin} AND rowid<{end}")
         rhs_begin = self._get_end()
         for (sql,) in sqllist:
             self._cursor.execute(sql)
