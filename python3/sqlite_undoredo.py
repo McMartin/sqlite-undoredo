@@ -24,7 +24,7 @@ if sys.version_info < (3, 6):
     sys.exit('Python version 3.6 or later is required')
 
 
-class SQLiteUndoRedo:
+class SQLiteUndoHistory:
 
     def __init__(self, db):
         self._db = db

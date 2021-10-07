@@ -18,7 +18,7 @@ from unittest import mock
 
 import apsw
 
-from sqlite_undoredo import SQLiteUndoRedo
+from sqlite_undoredo import SQLiteUndoHistory
 
 
 class SQLiteUndoRedoTest(unittest.TestCase):
@@ -30,7 +30,7 @@ class SQLiteUndoRedoTest(unittest.TestCase):
         self.test_db.execute("CREATE TABLE tbl1(a)")
         self.test_db.execute("CREATE TABLE tbl2(b)")
 
-        self.sqlur = SQLiteUndoRedo(self.test_db)
+        self.history = SQLiteUndoHistory(self.test_db)
 
     def tearDown(self):
         try:
@@ -41,196 +41,196 @@ class SQLiteUndoRedoTest(unittest.TestCase):
         self.db_connection.close()
 
     def test_record_undo_step(self):
-        self.sqlur.install('tbl1')
+        self.history.install('tbl1')
 
         self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (23,))
-        self.sqlur.record_undo_step()
-        self.assertEqual(self.sqlur._stack['undo'], [[1, 2]])
+        self.history.record_undo_step()
+        self.assertEqual(self.history._stack['undo'], [[1, 2]])
         self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (42,))
 
-        self.sqlur.record_undo_step()
+        self.history.record_undo_step()
 
-        self.assertEqual(self.sqlur._stack['undo'], [[1, 2], [2, 3]])
+        self.assertEqual(self.history._stack['undo'], [[1, 2], [2, 3]])
 
     def test_record_undo_step_several_changes(self):
-        self.sqlur.install('tbl1')
+        self.history.install('tbl1')
 
         self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (23,))
         self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (42,))
 
-        self.sqlur.record_undo_step()
+        self.history.record_undo_step()
 
-        self.assertEqual(self.sqlur._stack['undo'], [[1, 3]])
+        self.assertEqual(self.history._stack['undo'], [[1, 3]])
 
     def test_record_undo_step_after_no_changes(self):
-        self.sqlur.install('tbl1')
+        self.history.install('tbl1')
 
         self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (23,))
-        self.sqlur.record_undo_step()
-        self.assertEqual(self.sqlur._stack['undo'], [[1, 2]])
+        self.history.record_undo_step()
+        self.assertEqual(self.history._stack['undo'], [[1, 2]])
 
-        self.sqlur.record_undo_step()
+        self.history.record_undo_step()
 
-        self.assertEqual(self.sqlur._stack['undo'], [[1, 2]])
+        self.assertEqual(self.history._stack['undo'], [[1, 2]])
 
     def test_undo(self):
-        with mock.patch.object(self.sqlur, '_step') as mock_step:
-            self.sqlur.undo()
+        with mock.patch.object(self.history, '_step') as mock_step:
+            self.history.undo()
 
         mock_step.assert_called_with('undo', 'redo')
 
     def test_undo_insert(self):
-        self.sqlur.install('tbl1')
+        self.history.install('tbl1')
         self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (23,))
-        self.sqlur.record_undo_step()
+        self.history.record_undo_step()
 
         self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [(23,)])
 
-        self.sqlur.undo()
+        self.history.undo()
 
-        self.assertEqual(self.sqlur._stack['undo'], [])
-        self.assertEqual(self.sqlur._stack['redo'], [[1, 2]])
-        self.assertEqual(self.sqlur._previous_end, 2)
+        self.assertEqual(self.history._stack['undo'], [])
+        self.assertEqual(self.history._stack['redo'], [[1, 2]])
+        self.assertEqual(self.history._previous_end, 2)
         self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [])
 
     def test_undo_update(self):
-        self.sqlur.install('tbl1')
+        self.history.install('tbl1')
         self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (23,))
-        self.sqlur.record_undo_step()
+        self.history.record_undo_step()
         self.test_db.execute("UPDATE tbl1 SET a=? WHERE a=?", (42, 23,))
-        self.sqlur.record_undo_step()
+        self.history.record_undo_step()
 
         self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [(42,)])
 
-        self.sqlur.undo()
+        self.history.undo()
 
-        self.assertEqual(self.sqlur._stack['undo'], [[1, 2]])
-        self.assertEqual(self.sqlur._stack['redo'], [[2, 3]])
-        self.assertEqual(self.sqlur._previous_end, 3)
+        self.assertEqual(self.history._stack['undo'], [[1, 2]])
+        self.assertEqual(self.history._stack['redo'], [[2, 3]])
+        self.assertEqual(self.history._previous_end, 3)
         self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [(23,)])
 
     def test_undo_delete(self):
-        self.sqlur.install('tbl1')
+        self.history.install('tbl1')
         self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (23,))
-        self.sqlur.record_undo_step()
+        self.history.record_undo_step()
         self.test_db.execute("DELETE FROM tbl1 WHERE a=?", (23,))
-        self.sqlur.record_undo_step()
+        self.history.record_undo_step()
 
         self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [])
 
-        self.sqlur.undo()
+        self.history.undo()
 
-        self.assertEqual(self.sqlur._stack['undo'], [[1, 2]])
-        self.assertEqual(self.sqlur._stack['redo'], [[2, 3]])
-        self.assertEqual(self.sqlur._previous_end, 3)
+        self.assertEqual(self.history._stack['undo'], [[1, 2]])
+        self.assertEqual(self.history._stack['redo'], [[2, 3]])
+        self.assertEqual(self.history._previous_end, 3)
         self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [(23,)])
 
     def test_undo_several_changes(self):
-        self.sqlur.install('tbl1')
+        self.history.install('tbl1')
         self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (23,))
         self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (42,))
         self.test_db.execute("UPDATE tbl1 SET a=? WHERE a=?", (69, 42))
         self.test_db.execute("DELETE FROM tbl1 WHERE a=?", (23,))
-        self.sqlur.record_undo_step()
+        self.history.record_undo_step()
 
         self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [(69,)])
 
-        self.sqlur.undo()
+        self.history.undo()
 
-        self.assertEqual(self.sqlur._stack['undo'], [])
-        self.assertEqual(self.sqlur._stack['redo'], [[1, 5]])
-        self.assertEqual(self.sqlur._previous_end, 5)
+        self.assertEqual(self.history._stack['undo'], [])
+        self.assertEqual(self.history._stack['redo'], [[1, 5]])
+        self.assertEqual(self.history._previous_end, 5)
         self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [])
 
     def test_redo(self):
-        with mock.patch.object(self.sqlur, '_step') as mock_step:
-            self.sqlur.redo()
+        with mock.patch.object(self.history, '_step') as mock_step:
+            self.history.redo()
 
         mock_step.assert_called_with('redo', 'undo')
 
     def test_redo_insert(self):
-        self.sqlur.install('tbl1')
+        self.history.install('tbl1')
         self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (23,))
-        self.sqlur.record_undo_step()
-        self.sqlur.undo()
+        self.history.record_undo_step()
+        self.history.undo()
 
         self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [])
 
-        self.sqlur.redo()
+        self.history.redo()
 
-        self.assertEqual(self.sqlur._stack['undo'], [[1, 2]])
-        self.assertEqual(self.sqlur._stack['redo'], [])
-        self.assertEqual(self.sqlur._previous_end, 2)
+        self.assertEqual(self.history._stack['undo'], [[1, 2]])
+        self.assertEqual(self.history._stack['redo'], [])
+        self.assertEqual(self.history._previous_end, 2)
         self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [(23,)])
 
     def test_redo_update(self):
-        self.sqlur.install('tbl1')
+        self.history.install('tbl1')
         self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (23,))
-        self.sqlur.record_undo_step()
+        self.history.record_undo_step()
         self.test_db.execute("UPDATE tbl1 SET a=? WHERE a=?", (42, 23,))
-        self.sqlur.record_undo_step()
-        self.sqlur.undo()
+        self.history.record_undo_step()
+        self.history.undo()
 
         self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [(23,)])
 
-        self.sqlur.redo()
+        self.history.redo()
 
-        self.assertEqual(self.sqlur._stack['undo'], [[1, 2], [2, 3]])
-        self.assertEqual(self.sqlur._stack['redo'], [])
-        self.assertEqual(self.sqlur._previous_end, 3)
+        self.assertEqual(self.history._stack['undo'], [[1, 2], [2, 3]])
+        self.assertEqual(self.history._stack['redo'], [])
+        self.assertEqual(self.history._previous_end, 3)
         self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [(42,)])
 
     def test_redo_delete(self):
-        self.sqlur.install('tbl1')
+        self.history.install('tbl1')
         self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (23,))
-        self.sqlur.record_undo_step()
+        self.history.record_undo_step()
         self.test_db.execute("DELETE FROM tbl1 WHERE a=?", (23,))
-        self.sqlur.record_undo_step()
-        self.sqlur.undo()
+        self.history.record_undo_step()
+        self.history.undo()
 
         self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [(23,)])
 
-        self.sqlur.redo()
+        self.history.redo()
 
-        self.assertEqual(self.sqlur._stack['undo'], [[1, 2], [2, 3]])
-        self.assertEqual(self.sqlur._stack['redo'], [])
-        self.assertEqual(self.sqlur._previous_end, 3)
+        self.assertEqual(self.history._stack['undo'], [[1, 2], [2, 3]])
+        self.assertEqual(self.history._stack['redo'], [])
+        self.assertEqual(self.history._previous_end, 3)
         self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [])
 
     def test_redo_several_changes(self):
-        self.sqlur.install('tbl1')
+        self.history.install('tbl1')
         self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (23,))
         self.test_db.execute("INSERT INTO tbl1 VALUES(?)", (42,))
         self.test_db.execute("UPDATE tbl1 SET a=? WHERE a=?", (69, 42))
         self.test_db.execute("DELETE FROM tbl1 WHERE a=?", (23,))
-        self.sqlur.record_undo_step()
-        self.sqlur.undo()
+        self.history.record_undo_step()
+        self.history.undo()
 
         self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [])
 
-        self.sqlur.redo()
+        self.history.redo()
 
-        self.assertEqual(self.sqlur._stack['undo'], [[1, 5]])
-        self.assertEqual(self.sqlur._stack['redo'], [])
-        self.assertEqual(self.sqlur._previous_end, 5)
+        self.assertEqual(self.history._stack['undo'], [[1, 5]])
+        self.assertEqual(self.history._stack['redo'], [])
+        self.assertEqual(self.history._previous_end, 5)
         self.assertEqual(self.test_db.execute("SELECT * FROM tbl1").fetchall(), [(69,)])
 
     def test___init__(self):
-        self.assertIs(self.sqlur._db, self.test_db)
-        self.assertEqual(self.sqlur._stack, {'undo': [], 'redo': []})
-        self.assertEqual(self.sqlur._previous_end, 1)
+        self.assertIs(self.history._db, self.test_db)
+        self.assertEqual(self.history._stack, {'undo': [], 'redo': []})
+        self.assertEqual(self.history._previous_end, 1)
 
     def _get_triggers(self, db):
         return db.execute(
             "SELECT name FROM sqlite_temp_schema WHERE type='trigger'").fetchall()
 
     def test_install_no_tables(self):
-        self.sqlur.install()
+        self.history.install()
 
         self.assertEqual(self._get_triggers(self.test_db), [])
 
     def test_install_one_table(self):
-        self.sqlur.install('tbl1')
+        self.history.install('tbl1')
 
         self.assertEqual(
             self._get_triggers(self.test_db),
@@ -238,29 +238,29 @@ class SQLiteUndoRedoTest(unittest.TestCase):
         )
 
     def test_install_several_tables(self):
-        self.sqlur.install('tbl1', 'tbl2')
+        self.history.install('tbl1', 'tbl2')
 
         self.assertEqual(len(self._get_triggers(self.test_db)), 6)
 
     def test_uninstall(self):
-        self.sqlur.install('tbl1', 'tbl2')
+        self.history.install('tbl1', 'tbl2')
 
-        self.sqlur.uninstall('tbl1', 'tbl2')
+        self.history.uninstall('tbl1', 'tbl2')
 
         self.assertEqual(self._get_triggers(self.test_db), [])
 
     def test__get_end(self):
-        self.sqlur.install('tbl1')
+        self.history.install('tbl1')
 
-        self.assertEqual(self.sqlur._get_end(), 1)
+        self.assertEqual(self.history._get_end(), 1)
 
         self.test_db.executemany("INSERT INTO tbl1 VALUES(?)", [(23,), (42,)])
 
-        self.assertEqual(self.sqlur._get_end(), 3)
+        self.assertEqual(self.history._get_end(), 3)
 
-        self.sqlur.record_undo_step()
+        self.history.record_undo_step()
 
-        self.assertEqual(self.sqlur._get_end(), 3)
+        self.assertEqual(self.history._get_end(), 3)
 
 
 if __name__ == '__main__':
