@@ -38,40 +38,47 @@ class SQLiteUndoHistory:
         self._stack = {'undo': [], 'redo': []}
         self._previous_end = 1
 
-    def install(self, *args):
-        for tbl in args:
-            column_names = [
-                column[1]
-                for column in self._cursor.execute(f"pragma table_info({tbl})").fetchall()
-            ]
+    def install(self, tbl):
+        column_names = [
+            column[1]
+            for column in self._cursor.execute(f"pragma table_info({tbl})").fetchall()
+        ]
 
-            sql = f"""
-            CREATE TEMP TRIGGER _{tbl}_it AFTER INSERT ON {tbl} BEGIN
-                INSERT INTO undo_actions VALUES(
-                    'DELETE FROM {tbl} WHERE rowid='||NEW.rowid
-                );
-            END;
+        update_values = ", ".join(
+            [f"{name}='||quote(OLD.{name})||'" for name in column_names]
+        )
 
-            CREATE TEMP TRIGGER _{tbl}_ut AFTER UPDATE ON {tbl} BEGIN
-                INSERT INTO undo_actions VALUES(
-                    'UPDATE {tbl} SET {", ".join([f"{name}='||quote(OLD.{name})||'" for name in column_names])} WHERE rowid='||OLD.rowid
-                );
-            END;
+        insert_columns = ", ".join(["rowid"] + column_names)
+        insert_values =  ", ".join(
+            ["'||OLD.rowid||'"] + [f"'||quote(OLD.{name})||'" for name in column_names]
+        )
 
-            CREATE TEMP TRIGGER _{tbl}_dt AFTER DELETE ON {tbl} BEGIN
-                INSERT INTO undo_actions VALUES(
-                    'INSERT INTO {tbl} (rowid{"".join([f", {name}" for name in column_names])}) VALUES('||OLD.rowid||'{"".join([f", '||quote(OLD.{name})||'" for name in column_names])})'
-                );
-            END;
-            """
+        sql = f"""
+        CREATE TEMP TRIGGER _{tbl}_it AFTER INSERT ON {tbl} BEGIN
+            INSERT INTO undo_actions VALUES(
+                'DELETE FROM {tbl} WHERE rowid='||NEW.rowid
+            );
+        END;
 
-            self._cursor.execute(sql)
+        CREATE TEMP TRIGGER _{tbl}_ut AFTER UPDATE ON {tbl} BEGIN
+            INSERT INTO undo_actions VALUES(
+                'UPDATE {tbl} SET {update_values} WHERE rowid='||OLD.rowid
+            );
+        END;
 
-    def uninstall(self, *args):
-        for tbl in args:
-            self._cursor.execute(f"DROP TRIGGER IF EXISTS _{tbl}_it")
-            self._cursor.execute(f"DROP TRIGGER IF EXISTS _{tbl}_ut")
-            self._cursor.execute(f"DROP TRIGGER IF EXISTS _{tbl}_dt")
+        CREATE TEMP TRIGGER _{tbl}_dt AFTER DELETE ON {tbl} BEGIN
+            INSERT INTO undo_actions VALUES(
+                'INSERT INTO {tbl} ({insert_columns}) VALUES({insert_values})'
+            );
+        END;
+        """
+
+        self._cursor.execute(sql)
+
+    def uninstall(self, tbl):
+        self._cursor.execute(f"DROP TRIGGER IF EXISTS _{tbl}_it")
+        self._cursor.execute(f"DROP TRIGGER IF EXISTS _{tbl}_ut")
+        self._cursor.execute(f"DROP TRIGGER IF EXISTS _{tbl}_dt")
 
     def _get_end(self):
         return self._cursor.execute(

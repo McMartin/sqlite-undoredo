@@ -224,12 +224,7 @@ class SQLiteUndoRedoTest(unittest.TestCase):
         return db.execute(
             "SELECT name FROM sqlite_temp_schema WHERE type='trigger'").fetchall()
 
-    def test_install_no_tables(self):
-        self.history.install()
-
-        self.assertEqual(self._get_triggers(self.test_cursor), [])
-
-    def test_install_one_table(self):
+    def test_install(self):
         self.history.install('tbl1')
 
         self.assertEqual(
@@ -237,15 +232,10 @@ class SQLiteUndoRedoTest(unittest.TestCase):
             [('_tbl1_it',), ('_tbl1_ut',), ('_tbl1_dt',)],
         )
 
-    def test_install_several_tables(self):
-        self.history.install('tbl1', 'tbl2')
-
-        self.assertEqual(len(self._get_triggers(self.test_cursor)), 6)
-
     def test_uninstall(self):
-        self.history.install('tbl1', 'tbl2')
+        self.history.install('tbl1')
 
-        self.history.uninstall('tbl1', 'tbl2')
+        self.history.uninstall('tbl1')
 
         self.assertEqual(self._get_triggers(self.test_cursor), [])
 
