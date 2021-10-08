@@ -229,7 +229,7 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.assertEqual(
             self._get_triggers(self.test_cursor),
-            [('_tbl1_it',), ('_tbl1_ut',), ('_tbl1_dt',)],
+            [('undo_tbl1_insert',), ('undo_tbl1_update',), ('undo_tbl1_delete',)],
         )
 
     def test_uninstall(self):

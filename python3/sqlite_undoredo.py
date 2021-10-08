@@ -38,10 +38,10 @@ class SQLiteUndoHistory:
         self._stack = {'undo': [], 'redo': []}
         self._previous_end = 1
 
-    def install(self, tbl):
+    def install(self, table):
         column_names = [
             column[1]
-            for column in self._cursor.execute(f"pragma table_info({tbl})").fetchall()
+            for column in self._cursor.execute(f"pragma table_info({table})").fetchall()
         ]
 
         update_values = ", ".join(
@@ -54,31 +54,31 @@ class SQLiteUndoHistory:
         )
 
         sql = f"""
-        CREATE TEMP TRIGGER _{tbl}_it AFTER INSERT ON {tbl} BEGIN
-            INSERT INTO undo_actions VALUES(
-                'DELETE FROM {tbl} WHERE rowid='||NEW.rowid
-            );
-        END;
+            CREATE TEMP TRIGGER undo_{table}_insert AFTER INSERT ON {table} BEGIN
+                INSERT INTO undo_actions VALUES(
+                    'DELETE FROM {table} WHERE rowid='||NEW.rowid
+                );
+            END;
 
-        CREATE TEMP TRIGGER _{tbl}_ut AFTER UPDATE ON {tbl} BEGIN
-            INSERT INTO undo_actions VALUES(
-                'UPDATE {tbl} SET {update_values} WHERE rowid='||OLD.rowid
-            );
-        END;
+            CREATE TEMP TRIGGER undo_{table}_update AFTER UPDATE ON {table} BEGIN
+                INSERT INTO undo_actions VALUES(
+                    'UPDATE {table} SET {update_values} WHERE rowid='||OLD.rowid
+                );
+            END;
 
-        CREATE TEMP TRIGGER _{tbl}_dt AFTER DELETE ON {tbl} BEGIN
-            INSERT INTO undo_actions VALUES(
-                'INSERT INTO {tbl} ({insert_columns}) VALUES({insert_values})'
-            );
-        END;
+            CREATE TEMP TRIGGER undo_{table}_delete AFTER DELETE ON {table} BEGIN
+                INSERT INTO undo_actions VALUES(
+                    'INSERT INTO {table} ({insert_columns}) VALUES({insert_values})'
+                );
+            END;
         """
 
         self._cursor.execute(sql)
 
-    def uninstall(self, tbl):
-        self._cursor.execute(f"DROP TRIGGER IF EXISTS _{tbl}_it")
-        self._cursor.execute(f"DROP TRIGGER IF EXISTS _{tbl}_ut")
-        self._cursor.execute(f"DROP TRIGGER IF EXISTS _{tbl}_dt")
+    def uninstall(self, table):
+        self._cursor.execute(f"DROP TRIGGER IF EXISTS undo_{table}_insert")
+        self._cursor.execute(f"DROP TRIGGER IF EXISTS undo_{table}_update")
+        self._cursor.execute(f"DROP TRIGGER IF EXISTS undo_{table}_delete")
 
     def _get_end(self):
         return self._cursor.execute(
