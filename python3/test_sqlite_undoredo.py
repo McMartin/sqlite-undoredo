@@ -45,12 +45,12 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.test_cursor.execute("INSERT INTO tbl1 VALUES(?)", (23,))
         self.history.record_undo_step()
-        self.assertEqual(self.history._stack['undo'], [[1, 2]])
+        self.assertEqual(self.history._undo_stack, [[1, 2]])
         self.test_cursor.execute("INSERT INTO tbl1 VALUES(?)", (42,))
 
         self.history.record_undo_step()
 
-        self.assertEqual(self.history._stack['undo'], [[1, 2], [2, 3]])
+        self.assertEqual(self.history._undo_stack, [[1, 2], [2, 3]])
 
     def test_record_undo_step_several_changes(self):
         self.history.install('tbl1')
@@ -60,24 +60,26 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.history.record_undo_step()
 
-        self.assertEqual(self.history._stack['undo'], [[1, 3]])
+        self.assertEqual(self.history._undo_stack, [[1, 3]])
 
     def test_record_undo_step_after_no_changes(self):
         self.history.install('tbl1')
 
         self.test_cursor.execute("INSERT INTO tbl1 VALUES(?)", (23,))
         self.history.record_undo_step()
-        self.assertEqual(self.history._stack['undo'], [[1, 2]])
+        self.assertEqual(self.history._undo_stack, [[1, 2]])
 
         self.history.record_undo_step()
 
-        self.assertEqual(self.history._stack['undo'], [[1, 2]])
+        self.assertEqual(self.history._undo_stack, [[1, 2]])
 
     def test_undo(self):
         with mock.patch.object(self.history, '_step') as mock_step:
             self.history.undo()
 
-        mock_step.assert_called_with('undo', 'redo')
+        mock_step.assert_called_with(
+            self.history._undo_stack, self.history._redo_stack
+        )
 
     def test_undo_insert(self):
         self.history.install('tbl1')
@@ -88,8 +90,8 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.history.undo()
 
-        self.assertEqual(self.history._stack['undo'], [])
-        self.assertEqual(self.history._stack['redo'], [[1, 2]])
+        self.assertEqual(self.history._undo_stack, [])
+        self.assertEqual(self.history._redo_stack, [[1, 2]])
         self.assertEqual(self.history._previous_end, 2)
         self.assertEqual(self.test_cursor.execute("SELECT * FROM tbl1").fetchall(), [])
 
@@ -104,8 +106,8 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.history.undo()
 
-        self.assertEqual(self.history._stack['undo'], [[1, 2]])
-        self.assertEqual(self.history._stack['redo'], [[2, 3]])
+        self.assertEqual(self.history._undo_stack, [[1, 2]])
+        self.assertEqual(self.history._redo_stack, [[2, 3]])
         self.assertEqual(self.history._previous_end, 3)
         self.assertEqual(self.test_cursor.execute("SELECT * FROM tbl1").fetchall(), [(23,)])
 
@@ -120,8 +122,8 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.history.undo()
 
-        self.assertEqual(self.history._stack['undo'], [[1, 2]])
-        self.assertEqual(self.history._stack['redo'], [[2, 3]])
+        self.assertEqual(self.history._undo_stack, [[1, 2]])
+        self.assertEqual(self.history._redo_stack, [[2, 3]])
         self.assertEqual(self.history._previous_end, 3)
         self.assertEqual(self.test_cursor.execute("SELECT * FROM tbl1").fetchall(), [(23,)])
 
@@ -137,8 +139,8 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.history.undo()
 
-        self.assertEqual(self.history._stack['undo'], [])
-        self.assertEqual(self.history._stack['redo'], [[1, 5]])
+        self.assertEqual(self.history._undo_stack, [])
+        self.assertEqual(self.history._redo_stack, [[1, 5]])
         self.assertEqual(self.history._previous_end, 5)
         self.assertEqual(self.test_cursor.execute("SELECT * FROM tbl1").fetchall(), [])
 
@@ -146,7 +148,9 @@ class SQLiteUndoRedoTest(unittest.TestCase):
         with mock.patch.object(self.history, '_step') as mock_step:
             self.history.redo()
 
-        mock_step.assert_called_with('redo', 'undo')
+        mock_step.assert_called_with(
+            self.history._redo_stack, self.history._undo_stack
+        )
 
     def test_redo_insert(self):
         self.history.install('tbl1')
@@ -158,8 +162,8 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.history.redo()
 
-        self.assertEqual(self.history._stack['undo'], [[1, 2]])
-        self.assertEqual(self.history._stack['redo'], [])
+        self.assertEqual(self.history._undo_stack, [[1, 2]])
+        self.assertEqual(self.history._redo_stack, [])
         self.assertEqual(self.history._previous_end, 2)
         self.assertEqual(self.test_cursor.execute("SELECT * FROM tbl1").fetchall(), [(23,)])
 
@@ -175,8 +179,8 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.history.redo()
 
-        self.assertEqual(self.history._stack['undo'], [[1, 2], [2, 3]])
-        self.assertEqual(self.history._stack['redo'], [])
+        self.assertEqual(self.history._undo_stack, [[1, 2], [2, 3]])
+        self.assertEqual(self.history._redo_stack, [])
         self.assertEqual(self.history._previous_end, 3)
         self.assertEqual(self.test_cursor.execute("SELECT * FROM tbl1").fetchall(), [(42,)])
 
@@ -192,8 +196,8 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.history.redo()
 
-        self.assertEqual(self.history._stack['undo'], [[1, 2], [2, 3]])
-        self.assertEqual(self.history._stack['redo'], [])
+        self.assertEqual(self.history._undo_stack, [[1, 2], [2, 3]])
+        self.assertEqual(self.history._redo_stack, [])
         self.assertEqual(self.history._previous_end, 3)
         self.assertEqual(self.test_cursor.execute("SELECT * FROM tbl1").fetchall(), [])
 
@@ -210,14 +214,15 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.history.redo()
 
-        self.assertEqual(self.history._stack['undo'], [[1, 5]])
-        self.assertEqual(self.history._stack['redo'], [])
+        self.assertEqual(self.history._undo_stack, [[1, 5]])
+        self.assertEqual(self.history._redo_stack, [])
         self.assertEqual(self.history._previous_end, 5)
         self.assertEqual(self.test_cursor.execute("SELECT * FROM tbl1").fetchall(), [(69,)])
 
     def test___init__(self):
         self.assertIs(self.history._cursor, self.test_cursor)
-        self.assertEqual(self.history._stack, {'undo': [], 'redo': []})
+        self.assertEqual(self.history._undo_stack, [])
+        self.assertEqual(self.history._redo_stack, [])
         self.assertEqual(self.history._previous_end, 1)
 
     def _get_triggers(self, db):

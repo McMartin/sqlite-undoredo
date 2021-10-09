@@ -35,7 +35,8 @@ class SQLiteUndoHistory:
             pass
         self._cursor.execute("CREATE TEMP TABLE undo_actions(sql TEXT)")
 
-        self._stack = {'undo': [], 'redo': []}
+        self._undo_stack = []
+        self._redo_stack = []
         self._previous_end = 1
 
     def install(self, table):
@@ -89,12 +90,12 @@ class SQLiteUndoHistory:
         end = self._get_end()
         if begin == end:
             return
-        self._stack['undo'].append([begin, end])
-        self._stack['redo'] = []
+        self._undo_stack.append([begin, end])
+        self._redo_stack = []
         self._previous_end = end
 
     def _step(self, lhs, rhs):
-        (begin, end) = self._stack[lhs].pop()
+        (begin, end) = lhs.pop()
         self._cursor.execute('BEGIN')
         q1 = f"SELECT sql FROM undo_actions WHERE rowid>={begin} AND rowid<{end}" \
              " ORDER BY rowid DESC"
@@ -106,11 +107,11 @@ class SQLiteUndoHistory:
         self._cursor.execute('COMMIT')
 
         rhs_end = self._get_end()
-        self._stack[rhs].append([rhs_begin, rhs_end])
+        rhs.append([rhs_begin, rhs_end])
         self._previous_end = rhs_end
 
     def undo(self):
-        self._step('undo', 'redo')
+        self._step(self._undo_stack, self._redo_stack)
 
     def redo(self):
-        self._step('redo', 'undo')
+        self._step(self._redo_stack, self._undo_stack)
