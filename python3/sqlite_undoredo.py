@@ -33,10 +33,18 @@ class SQLiteUndoHistory:
             self._cursor.execute("DROP TABLE undo_redo_action")
         except apsw.SQLError:
             pass
-        self._cursor.execute("CREATE TEMP TABLE undo_redo_action(sql TEXT)")
+        self._cursor.execute("CREATE TEMP TABLE undo_redo_action(sql TEXT NOT NULL)")
+        self._cursor.execute("CREATE TEMP TABLE undo_step("
+            " first_action INTEGER NOT NULL,"
+            " last_action INTEGER NOT NULL,"
+            " CHECK (first_action <= last_action))"
+        )
+        self._cursor.execute("CREATE TEMP TABLE redo_step("
+            " first_action INTEGER NOT NULL,"
+            " last_action INTEGER NOT NULL,"
+            " CHECK (first_action <= last_action))"
+        )
 
-        self._undo_stack = []
-        self._redo_stack = []
         self._previous_end = (self._get_last_undo_redo_action() + 1)
 
     def install(self, table):
@@ -87,13 +95,20 @@ class SQLiteUndoHistory:
     def commit(self):
         end = (self._get_last_undo_redo_action() + 1)
         if self._previous_end != end:
-            self._undo_stack.append((self._previous_end, self._get_last_undo_redo_action()))
-            self._redo_stack = []
+            self._cursor.execute(
+                "INSERT INTO undo_step (first_action, last_action) VALUES(?, ?)",
+                (self._previous_end, self._get_last_undo_redo_action()),
+            )
+            self._cursor.execute("DELETE FROM redo_step")
             self._previous_end = end
 
-    def _step(self, lhs, rhs):
-        first_action, last_action = lhs.pop()
+    def _step(self, lhs_table, rhs_table):
         self._cursor.execute('BEGIN')
+        last_rowid = self._cursor.execute(f"SELECT max(rowid) FROM {lhs_table}").fetchone()[0]
+        first_action, last_action = self._cursor.execute(
+            f"SELECT first_action, last_action FROM {lhs_table} WHERE rowid = {last_rowid}"
+        ).fetchone()
+        self._cursor.execute(f"DELETE FROM {lhs_table} WHERE rowid = {last_rowid}")
         condition = f"rowid >= {first_action} AND rowid <= {last_action}"
         sql_statements = self._cursor.execute(
             f"SELECT sql FROM undo_redo_action WHERE {condition} ORDER BY rowid DESC"
@@ -104,11 +119,15 @@ class SQLiteUndoHistory:
             self._cursor.execute(statement)
         self._cursor.execute('COMMIT')
 
-        rhs.append((end_before_replay, self._get_last_undo_redo_action()))
+        self._cursor.execute(
+            f"INSERT INTO {rhs_table} (first_action, last_action) VALUES(?, ?)",
+            (end_before_replay, self._get_last_undo_redo_action()),
+        )
+
         self._previous_end = (self._get_last_undo_redo_action() + 1)
 
     def undo(self):
-        self._step(self._undo_stack, self._redo_stack)
+        self._step('undo_step', 'redo_step')
 
     def redo(self):
-        self._step(self._redo_stack, self._undo_stack)
+        self._step('redo_step', 'undo_step')
