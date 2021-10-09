@@ -79,35 +79,38 @@ class SQLiteUndoHistory:
         self._cursor.execute(f"DROP TRIGGER IF EXISTS undo_{table}_update")
         self._cursor.execute(f"DROP TRIGGER IF EXISTS undo_{table}_delete")
 
+    def _get_last_undo_action(self):
+        return self._cursor.execute(
+            "SELECT coalesce(max(rowid), 0) FROM undo_actions"
+        ).fetchone()[0]
+
     def _get_end(self):
         return self._cursor.execute(
             "SELECT coalesce(max(rowid), 0) + 1 FROM undo_actions"
         ).fetchone()[0]
 
     def commit(self):
-        begin = self._previous_end
         end = self._get_end()
-        if begin != end:
-            self._undo_stack.append((begin, end))
+        if self._previous_end != end:
+            self._undo_stack.append((self._previous_end, self._get_last_undo_action()))
             self._redo_stack = []
             self._previous_end = end
 
     def _step(self, lhs, rhs):
-        begin, end = lhs.pop()
+        first_action, last_action = lhs.pop()
         self._cursor.execute('BEGIN')
-        condition = f"rowid >= {begin} AND rowid < {end}"
+        condition = f"rowid >= {first_action} AND rowid <= {last_action}"
         sql_statements = self._cursor.execute(
             f"SELECT sql FROM undo_actions WHERE {condition} ORDER BY rowid DESC"
         ).fetchall()
         self._cursor.execute(f"DELETE FROM undo_actions WHERE {condition}")
-        rhs_begin = self._get_end()
+        end_before_replay = self._get_end()
         for (statement,) in sql_statements:
             self._cursor.execute(statement)
         self._cursor.execute('COMMIT')
 
-        rhs_end = self._get_end()
-        rhs.append((rhs_begin, rhs_end))
-        self._previous_end = rhs_end
+        rhs.append((end_before_replay, self._get_last_undo_action()))
+        self._previous_end = self._get_end()
 
     def undo(self):
         self._step(self._undo_stack, self._redo_stack)
