@@ -37,7 +37,7 @@ class SQLiteUndoHistory:
 
         self._undo_stack = []
         self._redo_stack = []
-        self._previous_end = 1
+        self._previous_end = self._get_end()
 
     def install(self, table):
         column_names = [
@@ -85,7 +85,7 @@ class SQLiteUndoHistory:
         return self._cursor.execute(
             "SELECT coalesce(max(rowid),0)+1 FROM undo_actions").fetchone()[0]
 
-    def record_undo_step(self):
+    def commit(self):
         begin = self._previous_end
         end = self._get_end()
         if begin == end:

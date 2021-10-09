@@ -40,36 +40,36 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.db_connection.close()
 
-    def test_record_undo_step(self):
+    def test_commit(self):
         self.history.install('tbl1')
 
         self.test_cursor.execute("INSERT INTO tbl1 VALUES(?)", (23,))
-        self.history.record_undo_step()
+        self.history.commit()
         self.assertEqual(self.history._undo_stack, [[1, 2]])
         self.test_cursor.execute("INSERT INTO tbl1 VALUES(?)", (42,))
 
-        self.history.record_undo_step()
+        self.history.commit()
 
         self.assertEqual(self.history._undo_stack, [[1, 2], [2, 3]])
 
-    def test_record_undo_step_several_changes(self):
+    def test_commit_several_changes(self):
         self.history.install('tbl1')
 
         self.test_cursor.execute("INSERT INTO tbl1 VALUES(?)", (23,))
         self.test_cursor.execute("INSERT INTO tbl1 VALUES(?)", (42,))
 
-        self.history.record_undo_step()
+        self.history.commit()
 
         self.assertEqual(self.history._undo_stack, [[1, 3]])
 
-    def test_record_undo_step_after_no_changes(self):
+    def test_commit_after_no_changes(self):
         self.history.install('tbl1')
 
         self.test_cursor.execute("INSERT INTO tbl1 VALUES(?)", (23,))
-        self.history.record_undo_step()
+        self.history.commit()
         self.assertEqual(self.history._undo_stack, [[1, 2]])
 
-        self.history.record_undo_step()
+        self.history.commit()
 
         self.assertEqual(self.history._undo_stack, [[1, 2]])
 
@@ -84,7 +84,7 @@ class SQLiteUndoRedoTest(unittest.TestCase):
     def test_undo_insert(self):
         self.history.install('tbl1')
         self.test_cursor.execute("INSERT INTO tbl1 VALUES(?)", (23,))
-        self.history.record_undo_step()
+        self.history.commit()
 
         self.assertEqual(self.test_cursor.execute("SELECT * FROM tbl1").fetchall(), [(23,)])
 
@@ -98,9 +98,9 @@ class SQLiteUndoRedoTest(unittest.TestCase):
     def test_undo_update(self):
         self.history.install('tbl1')
         self.test_cursor.execute("INSERT INTO tbl1 VALUES(?)", (23,))
-        self.history.record_undo_step()
+        self.history.commit()
         self.test_cursor.execute("UPDATE tbl1 SET a=? WHERE a=?", (42, 23,))
-        self.history.record_undo_step()
+        self.history.commit()
 
         self.assertEqual(self.test_cursor.execute("SELECT * FROM tbl1").fetchall(), [(42,)])
 
@@ -114,9 +114,9 @@ class SQLiteUndoRedoTest(unittest.TestCase):
     def test_undo_delete(self):
         self.history.install('tbl1')
         self.test_cursor.execute("INSERT INTO tbl1 VALUES(?)", (23,))
-        self.history.record_undo_step()
+        self.history.commit()
         self.test_cursor.execute("DELETE FROM tbl1 WHERE a=?", (23,))
-        self.history.record_undo_step()
+        self.history.commit()
 
         self.assertEqual(self.test_cursor.execute("SELECT * FROM tbl1").fetchall(), [])
 
@@ -133,7 +133,7 @@ class SQLiteUndoRedoTest(unittest.TestCase):
         self.test_cursor.execute("INSERT INTO tbl1 VALUES(?)", (42,))
         self.test_cursor.execute("UPDATE tbl1 SET a=? WHERE a=?", (69, 42))
         self.test_cursor.execute("DELETE FROM tbl1 WHERE a=?", (23,))
-        self.history.record_undo_step()
+        self.history.commit()
 
         self.assertEqual(self.test_cursor.execute("SELECT * FROM tbl1").fetchall(), [(69,)])
 
@@ -155,7 +155,7 @@ class SQLiteUndoRedoTest(unittest.TestCase):
     def test_redo_insert(self):
         self.history.install('tbl1')
         self.test_cursor.execute("INSERT INTO tbl1 VALUES(?)", (23,))
-        self.history.record_undo_step()
+        self.history.commit()
         self.history.undo()
 
         self.assertEqual(self.test_cursor.execute("SELECT * FROM tbl1").fetchall(), [])
@@ -170,9 +170,9 @@ class SQLiteUndoRedoTest(unittest.TestCase):
     def test_redo_update(self):
         self.history.install('tbl1')
         self.test_cursor.execute("INSERT INTO tbl1 VALUES(?)", (23,))
-        self.history.record_undo_step()
+        self.history.commit()
         self.test_cursor.execute("UPDATE tbl1 SET a=? WHERE a=?", (42, 23,))
-        self.history.record_undo_step()
+        self.history.commit()
         self.history.undo()
 
         self.assertEqual(self.test_cursor.execute("SELECT * FROM tbl1").fetchall(), [(23,)])
@@ -187,9 +187,9 @@ class SQLiteUndoRedoTest(unittest.TestCase):
     def test_redo_delete(self):
         self.history.install('tbl1')
         self.test_cursor.execute("INSERT INTO tbl1 VALUES(?)", (23,))
-        self.history.record_undo_step()
+        self.history.commit()
         self.test_cursor.execute("DELETE FROM tbl1 WHERE a=?", (23,))
-        self.history.record_undo_step()
+        self.history.commit()
         self.history.undo()
 
         self.assertEqual(self.test_cursor.execute("SELECT * FROM tbl1").fetchall(), [(23,)])
@@ -207,7 +207,7 @@ class SQLiteUndoRedoTest(unittest.TestCase):
         self.test_cursor.execute("INSERT INTO tbl1 VALUES(?)", (42,))
         self.test_cursor.execute("UPDATE tbl1 SET a=? WHERE a=?", (69, 42))
         self.test_cursor.execute("DELETE FROM tbl1 WHERE a=?", (23,))
-        self.history.record_undo_step()
+        self.history.commit()
         self.history.undo()
 
         self.assertEqual(self.test_cursor.execute("SELECT * FROM tbl1").fetchall(), [])
@@ -253,7 +253,7 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.assertEqual(self.history._get_end(), 3)
 
-        self.history.record_undo_step()
+        self.history.commit()
 
         self.assertEqual(self.history._get_end(), 3)
 
