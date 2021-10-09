@@ -88,7 +88,7 @@ class SQLiteUndoHistory:
         begin = self._previous_end
         end = self._get_end()
         if begin != end:
-            self._undo_stack.append([begin, end])
+            self._undo_stack.append((begin, end))
             self._redo_stack = []
             self._previous_end = end
 
@@ -106,7 +106,7 @@ class SQLiteUndoHistory:
         self._cursor.execute('COMMIT')
 
         rhs_end = self._get_end()
-        rhs.append([rhs_begin, rhs_end])
+        rhs.append((rhs_begin, rhs_end))
         self._previous_end = rhs_end
 
     def undo(self):
