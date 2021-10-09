@@ -244,18 +244,18 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.assertEqual(self._get_triggers(self.test_cursor), [])
 
-    def test__get_last_undo_action(self):
+    def test__get_last_undo_redo_action(self):
         self.history.install('tbl1')
 
-        self.assertEqual(self.history._get_last_undo_action(), 0)
+        self.assertEqual(self.history._get_last_undo_redo_action(), 0)
 
         self.test_cursor.executemany("INSERT INTO tbl1 VALUES(?)", [(23,), (42,)])
 
-        self.assertEqual(self.history._get_last_undo_action(), 2)
+        self.assertEqual(self.history._get_last_undo_redo_action(), 2)
 
         self.history.commit()
 
-        self.assertEqual(self.history._get_last_undo_action(), 2)
+        self.assertEqual(self.history._get_last_undo_redo_action(), 2)
 
 
 if __name__ == '__main__':
