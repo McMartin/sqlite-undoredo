@@ -257,19 +257,6 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.assertEqual(self.history._get_last_undo_action(), 2)
 
-    def test__get_end(self):
-        self.history.install('tbl1')
-
-        self.assertEqual(self.history._get_end(), 1)
-
-        self.test_cursor.executemany("INSERT INTO tbl1 VALUES(?)", [(23,), (42,)])
-
-        self.assertEqual(self.history._get_end(), 3)
-
-        self.history.commit()
-
-        self.assertEqual(self.history._get_end(), 3)
-
 
 if __name__ == '__main__':
     unittest.main()
