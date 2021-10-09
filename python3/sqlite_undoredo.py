@@ -54,7 +54,7 @@ class SQLiteUndoHistory:
             ["'||OLD.rowid||'"] + [f"'||quote(OLD.{name})||'" for name in column_names]
         )
 
-        sql = f"""
+        self._cursor.execute(f"""
             CREATE TEMP TRIGGER undo_{table}_insert AFTER INSERT ON {table} BEGIN
                 INSERT INTO undo_actions VALUES(
                     'DELETE FROM {table} WHERE rowid='||NEW.rowid
@@ -72,9 +72,7 @@ class SQLiteUndoHistory:
                     'INSERT INTO {table} ({insert_columns}) VALUES({insert_values})'
                 );
             END;
-        """
-
-        self._cursor.execute(sql)
+        """)
 
     def uninstall(self, table):
         self._cursor.execute(f"DROP TRIGGER IF EXISTS undo_{table}_insert")
@@ -83,27 +81,28 @@ class SQLiteUndoHistory:
 
     def _get_end(self):
         return self._cursor.execute(
-            "SELECT coalesce(max(rowid),0)+1 FROM undo_actions").fetchone()[0]
+            "SELECT coalesce(max(rowid), 0) + 1 FROM undo_actions"
+        ).fetchone()[0]
 
     def commit(self):
         begin = self._previous_end
         end = self._get_end()
-        if begin == end:
-            return
-        self._undo_stack.append([begin, end])
-        self._redo_stack = []
-        self._previous_end = end
+        if begin != end:
+            self._undo_stack.append([begin, end])
+            self._redo_stack = []
+            self._previous_end = end
 
     def _step(self, lhs, rhs):
-        (begin, end) = lhs.pop()
+        begin, end = lhs.pop()
         self._cursor.execute('BEGIN')
-        q1 = f"SELECT sql FROM undo_actions WHERE rowid>={begin} AND rowid<{end}" \
-             " ORDER BY rowid DESC"
-        sqllist = self._cursor.execute(q1).fetchall()
-        self._cursor.execute(f"DELETE FROM undo_actions WHERE rowid>={begin} AND rowid<{end}")
+        condition = f"rowid >= {begin} AND rowid < {end}"
+        sql_statements = self._cursor.execute(
+            f"SELECT sql FROM undo_actions WHERE {condition} ORDER BY rowid DESC"
+        ).fetchall()
+        self._cursor.execute(f"DELETE FROM undo_actions WHERE {condition}")
         rhs_begin = self._get_end()
-        for (sql,) in sqllist:
-            self._cursor.execute(sql)
+        for (statement,) in sql_statements:
+            self._cursor.execute(statement)
         self._cursor.execute('COMMIT')
 
         rhs_end = self._get_end()
