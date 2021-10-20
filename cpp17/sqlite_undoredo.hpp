@@ -32,9 +32,9 @@ struct SQLiteUndoRedo
 
   //! Start up the undo/redo system
   //!
-  //! Arguments should be one or more database tables (in the database
-  //! associated with the handle "db") whose changes are to be recorded for
-  //! undo/redo purposes.
+  //! Arguments should be one or more database tables (in the database associated
+  //! with the handle "db") whose changes are to be recorded for undo/redo
+  //! purposes.
   template <typename... Args>
   void activate(Args... args) {
     if (_undo.active) return;
@@ -199,9 +199,9 @@ struct SQLiteUndoRedo
   //!  Create change recording triggers for all tables listed
   //!
   //! Create a temporary table in the database named "undolog".  Create
-  //! triggers that fire on any insert, delete, or update of TABLE1, TABLE2,
-  //! .... When those triggers fire, insert records in undolog that contain SQL
-  //! text for statements that will undo the insert, delete, or update.
+  //! triggers that fire on any insert, delete, or update of TABLE1, TABLE2, ....
+  //! When those triggers fire, insert records in undolog that contain
+  //! SQL text for statements that will undo the insert, delete, or update.
   template <typename... Args>
   static void _create_triggers(sqlitelib::Sqlite& db, Args... args) {
     using namespace std::string_literals;
