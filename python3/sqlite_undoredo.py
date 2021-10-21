@@ -63,7 +63,7 @@ class SQLiteUndoRedo:
         if 'freeze' not in _undo:
             return
         if _undo['freeze'] >= 0:
-            raise Exception("recursive call to freeze")
+            raise Exception("recursive call to SQLiteUndoRedo.freeze")
         _undo['freeze'] = self._db.execute(
             "SELECT coalesce(max(seq),0) FROM undolog").fetchone()[0]
 
@@ -73,7 +73,7 @@ class SQLiteUndoRedo:
         if 'freeze' not in _undo:
             return
         if _undo['freeze'] < 0:
-            raise Exception("called unfreeze while not frozen")
+            raise Exception("called SQLiteUndoRedo.unfreeze while not frozen")
         self._db.execute(f"DELETE FROM undolog WHERE seq>{_undo['freeze']}")
         _undo['freeze'] = -1
 
