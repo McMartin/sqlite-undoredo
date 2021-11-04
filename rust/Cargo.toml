@@ -1,0 +1,11 @@
+[package]
+name = "sqlite_undo_redo"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies.fallible-iterator]
+version = "0.2"
+
+[dependencies.rusqlite]
+version = "0.26.0"
+features = ["bundled"]
