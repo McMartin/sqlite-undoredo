@@ -37,11 +37,13 @@ class SQLiteUndoHistory:
         self._cursor.execute("""CREATE TEMP TABLE undo_step(
             first_action INTEGER UNIQUE NOT NULL,
             last_action INTEGER UNIQUE NOT NULL,
+            text TEXT NOT NULL,
             CHECK (first_action <= last_action))
         """)
         self._cursor.execute("""CREATE TEMP TABLE redo_step(
             first_action INTEGER UNIQUE NOT NULL,
             last_action INTEGER UNIQUE NOT NULL,
+            text TEXT NOT NULL,
             CHECK (first_action <= last_action))
         """)
 
@@ -90,7 +92,7 @@ class SQLiteUndoHistory:
             "SELECT coalesce(max(rowid), 0) FROM undo_redo_action"
         ).fetchone()[0]
 
-    def commit(self):
+    def commit(self, text):
         end = self._get_last_undo_redo_action()
 
         last_undo_action = self._cursor.execute(
@@ -104,15 +106,15 @@ class SQLiteUndoHistory:
 
         if last_recorded_action < end:
             self._cursor.execute(
-                "INSERT INTO undo_step (first_action, last_action) VALUES(?, ?)",
-                (last_recorded_action + 1, end),
+                "INSERT INTO undo_step (first_action, last_action, text) VALUES(?, ?, ?)",
+                (last_recorded_action + 1, end, text),
             )
             self._cursor.execute("DELETE FROM redo_step")
 
     def _step(self, lhs_table, rhs_table):
         self._cursor.execute('BEGIN')
-        rowid, first_action, last_action = self._cursor.execute(
-            f"SELECT rowid, first_action, last_action FROM {lhs_table}"
+        rowid, first_action, last_action, text = self._cursor.execute(
+            f"SELECT rowid, first_action, last_action, text FROM {lhs_table}"
             " ORDER BY rowid DESC LIMIT 1"
         ).fetchone()
         self._cursor.execute(f"DELETE FROM {lhs_table} WHERE rowid=?", (rowid,))
@@ -131,10 +133,9 @@ class SQLiteUndoHistory:
         self._cursor.execute('COMMIT')
 
         self._cursor.execute(
-            f"INSERT INTO {rhs_table} (first_action, last_action) VALUES(?, ?)",
-            (end_before_replay, self._get_last_undo_redo_action()),
+            f"INSERT INTO {rhs_table} (first_action, last_action, text) VALUES(?, ?, ?)",
+            (end_before_replay, self._get_last_undo_redo_action(), text),
         )
-
 
     def undo(self):
         self._step('undo_step', 'redo_step')
