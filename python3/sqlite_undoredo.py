@@ -35,13 +35,13 @@ class SQLiteUndoHistory:
             pass
         self._cursor.execute("CREATE TEMP TABLE undo_redo_action(sql TEXT NOT NULL)")
         self._cursor.execute("""CREATE TEMP TABLE undo_step(
-            first_action INTEGER NOT NULL,
-            last_action INTEGER NOT NULL,
+            first_action INTEGER UNIQUE NOT NULL,
+            last_action INTEGER UNIQUE NOT NULL,
             CHECK (first_action <= last_action))
         """)
         self._cursor.execute("""CREATE TEMP TABLE redo_step(
-            first_action INTEGER NOT NULL,
-            last_action INTEGER NOT NULL,
+            first_action INTEGER UNIQUE NOT NULL,
+            last_action INTEGER UNIQUE NOT NULL,
             CHECK (first_action <= last_action))
         """)
 
