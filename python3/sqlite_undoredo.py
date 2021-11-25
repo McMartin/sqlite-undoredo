@@ -104,11 +104,10 @@ class SQLiteUndoHistory:
 
     def _step(self, lhs_table, rhs_table):
         self._cursor.execute('BEGIN')
-        last_rowid = self._cursor.execute(f"SELECT max(rowid) FROM {lhs_table}").fetchone()[0]
-        first_action, last_action = self._cursor.execute(
-            f"SELECT first_action, last_action FROM {lhs_table} WHERE rowid = {last_rowid}"
+        rowid, first_action, last_action = self._cursor.execute(
+            f"SELECT rowid, first_action, last_action FROM {lhs_table} ORDER BY rowid DESC LIMIT 1"
         ).fetchone()
-        self._cursor.execute(f"DELETE FROM {lhs_table} WHERE rowid = {last_rowid}")
+        self._cursor.execute(f"DELETE FROM {lhs_table} WHERE rowid = {rowid}")
         condition = f"rowid >= {first_action} AND rowid <= {last_action}"
         sql_statements = self._cursor.execute(
             f"SELECT sql FROM undo_redo_action WHERE {condition} ORDER BY rowid DESC"
