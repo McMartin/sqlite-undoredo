@@ -93,7 +93,6 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.assertEqual(self._select_all('undo_step'), [])
         self.assertEqual(self._select_all('redo_step'), [(1, 1)])
-        self.assertEqual(self.history._previous_end, 2)
         self.assertEqual(self._select_all('tbl1'), [])
 
     def test_undo_update(self):
@@ -109,7 +108,6 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.assertEqual(self._select_all('undo_step'), [(1, 1)])
         self.assertEqual(self._select_all('redo_step'), [(2, 2)])
-        self.assertEqual(self.history._previous_end, 3)
         self.assertEqual(self._select_all('tbl1'), [(23,)])
 
     def test_undo_delete(self):
@@ -125,7 +123,6 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.assertEqual(self._select_all('undo_step'), [(1, 1)])
         self.assertEqual(self._select_all('redo_step'), [(2, 2)])
-        self.assertEqual(self.history._previous_end, 3)
         self.assertEqual(self._select_all('tbl1'), [(23,)])
 
     def test_undo_several_changes(self):
@@ -142,7 +139,6 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.assertEqual(self._select_all('undo_step'), [])
         self.assertEqual(self._select_all('redo_step'), [(1, 4)])
-        self.assertEqual(self.history._previous_end, 5)
         self.assertEqual(self._select_all('tbl1'), [])
 
     def test_redo(self):
@@ -163,7 +159,6 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.assertEqual(self._select_all('undo_step'), [(1, 1)])
         self.assertEqual(self._select_all('redo_step'), [])
-        self.assertEqual(self.history._previous_end, 2)
         self.assertEqual(self._select_all('tbl1'), [(23,)])
 
     def test_redo_update(self):
@@ -180,7 +175,6 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.assertEqual(self._select_all('undo_step'), [(1, 1), (2, 2)])
         self.assertEqual(self._select_all('redo_step'), [])
-        self.assertEqual(self.history._previous_end, 3)
         self.assertEqual(self._select_all('tbl1'), [(42,)])
 
     def test_redo_delete(self):
@@ -197,7 +191,6 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.assertEqual(self._select_all('undo_step'), [(1, 1), (2, 2)])
         self.assertEqual(self._select_all('redo_step'), [])
-        self.assertEqual(self.history._previous_end, 3)
         self.assertEqual(self._select_all('tbl1'), [])
 
     def test_redo_several_changes(self):
@@ -215,14 +208,12 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.assertEqual(self._select_all('undo_step'), [(1, 4)])
         self.assertEqual(self._select_all('redo_step'), [])
-        self.assertEqual(self.history._previous_end, 5)
         self.assertEqual(self._select_all('tbl1'), [(69,)])
 
     def test___init__(self):
         self.assertIs(self.history._cursor, self.test_cursor)
         self.assertEqual(self._select_all('undo_step'), [])
         self.assertEqual(self._select_all('redo_step'), [])
-        self.assertEqual(self.history._previous_end, 1)
 
     def _get_triggers(self, db):
         return db.execute(

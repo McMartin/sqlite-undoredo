@@ -45,8 +45,6 @@ class SQLiteUndoHistory:
             CHECK (first_action <= last_action))
         """)
 
-        self._previous_end = (self._get_last_undo_redo_action() + 1)
-
     def install(self, table):
         column_names = [
             column[1]
@@ -93,14 +91,23 @@ class SQLiteUndoHistory:
         ).fetchone()[0]
 
     def commit(self):
-        end = (self._get_last_undo_redo_action() + 1)
-        if self._previous_end != end:
+        end = self._get_last_undo_redo_action()
+
+        last_undo_action = self._cursor.execute(
+            "SELECT coalesce(max(last_action), 0) FROM undo_step"
+        ).fetchone()[0]
+        last_redo_action = self._cursor.execute(
+            "SELECT coalesce(max(last_action), 0) FROM redo_step"
+        ).fetchone()[0]
+
+        last_recorded_action = max(last_undo_action, last_redo_action)
+
+        if last_recorded_action < end:
             self._cursor.execute(
                 "INSERT INTO undo_step (first_action, last_action) VALUES(?, ?)",
-                (self._previous_end, self._get_last_undo_redo_action()),
+                (last_recorded_action + 1, end),
             )
             self._cursor.execute("DELETE FROM redo_step")
-            self._previous_end = end
 
     def _step(self, lhs_table, rhs_table):
         self._cursor.execute('BEGIN')
@@ -128,7 +135,6 @@ class SQLiteUndoHistory:
             (end_before_replay, self._get_last_undo_redo_action()),
         )
 
-        self._previous_end = (self._get_last_undo_redo_action() + 1)
 
     def undo(self):
         self._step('undo_step', 'redo_step')
