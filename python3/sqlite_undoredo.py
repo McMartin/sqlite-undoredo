@@ -34,16 +34,16 @@ class SQLiteUndoHistory:
         except apsw.SQLError:
             pass
         self._cursor.execute("CREATE TEMP TABLE undo_redo_action(sql TEXT NOT NULL)")
-        self._cursor.execute("CREATE TEMP TABLE undo_step("
-            " first_action INTEGER NOT NULL,"
-            " last_action INTEGER NOT NULL,"
-            " CHECK (first_action <= last_action))"
-        )
-        self._cursor.execute("CREATE TEMP TABLE redo_step("
-            " first_action INTEGER NOT NULL,"
-            " last_action INTEGER NOT NULL,"
-            " CHECK (first_action <= last_action))"
-        )
+        self._cursor.execute("""CREATE TEMP TABLE undo_step(
+            first_action INTEGER NOT NULL,
+            last_action INTEGER NOT NULL,
+            CHECK (first_action <= last_action))
+        """)
+        self._cursor.execute("""CREATE TEMP TABLE redo_step(
+            first_action INTEGER NOT NULL,
+            last_action INTEGER NOT NULL,
+            CHECK (first_action <= last_action))
+        """)
 
         self._previous_end = (self._get_last_undo_redo_action() + 1)
 
@@ -58,7 +58,7 @@ class SQLiteUndoHistory:
         )
 
         insert_columns = ", ".join(["rowid"] + column_names)
-        insert_values =  ", ".join(
+        insert_values = ", ".join(
             ["'||OLD.rowid||'"] + [f"'||quote(OLD.{name})||'" for name in column_names]
         )
 
@@ -105,7 +105,8 @@ class SQLiteUndoHistory:
     def _step(self, lhs_table, rhs_table):
         self._cursor.execute('BEGIN')
         rowid, first_action, last_action = self._cursor.execute(
-            f"SELECT rowid, first_action, last_action FROM {lhs_table} ORDER BY rowid DESC LIMIT 1"
+            f"SELECT rowid, first_action, last_action FROM {lhs_table}"
+            " ORDER BY rowid DESC LIMIT 1"
         ).fetchone()
         self._cursor.execute(f"DELETE FROM {lhs_table} WHERE rowid = {rowid}")
         condition = f"rowid >= {first_action} AND rowid <= {last_action}"
