@@ -108,12 +108,16 @@ class SQLiteUndoHistory:
             f"SELECT rowid, first_action, last_action FROM {lhs_table}"
             " ORDER BY rowid DESC LIMIT 1"
         ).fetchone()
-        self._cursor.execute(f"DELETE FROM {lhs_table} WHERE rowid = {rowid}")
-        condition = f"rowid >= {first_action} AND rowid <= {last_action}"
+        self._cursor.execute(f"DELETE FROM {lhs_table} WHERE rowid=?", (rowid,))
         sql_statements = self._cursor.execute(
-            f"SELECT sql FROM undo_redo_action WHERE {condition} ORDER BY rowid DESC"
+            "SELECT sql FROM undo_redo_action WHERE rowid >= ? AND rowid <= ?"
+            " ORDER BY rowid DESC",
+            (first_action, last_action),
         ).fetchall()
-        self._cursor.execute(f"DELETE FROM undo_redo_action WHERE {condition}")
+        self._cursor.execute(
+            "DELETE FROM undo_redo_action WHERE rowid >= ? AND rowid <= ?",
+            (first_action, last_action),
+        )
         end_before_replay = (self._get_last_undo_redo_action() + 1)
         for (statement,) in sql_statements:
             self._cursor.execute(statement)
