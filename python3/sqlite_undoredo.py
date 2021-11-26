@@ -88,11 +88,6 @@ class SQLiteUndoHistory:
         self._cursor.execute(f"DROP TRIGGER IF EXISTS undo_{table}_update")
         self._cursor.execute(f"DROP TRIGGER IF EXISTS undo_{table}_delete")
 
-    def _get_last_undo_redo_action(self):
-        return self._cursor.execute(
-            "SELECT coalesce(max(rowid), 0) FROM undo_redo_action"
-        ).fetchone()[0]
-
     def commit(self, text):
         uncommitted_actions_count = self._cursor.execute(
             "SELECT COUNT(rowid) FROM undo_redo_action"
