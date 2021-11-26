@@ -48,12 +48,14 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.test_cursor.execute("INSERT INTO tbl1 VALUES(?)", (23,))
         self.history.commit("Add 23")
-        self.assertEqual(self._select_all('undo_step'), [(1, "Add 23")])
+        self.assertEqual(self._select_all('undo_redo_step'), [(1, 0, "Add 23")])
         self.test_cursor.execute("INSERT INTO tbl1 VALUES(?)", (42,))
 
         self.history.commit("Add 42")
 
-        self.assertEqual(self._select_all('undo_step'), [(1, "Add 23"), (2, "Add 42")])
+        self.assertEqual(
+            self._select_all('undo_redo_step'), [(1, 0, "Add 23"), (2, 0, "Add 42")]
+        )
 
     def test_commit_several_changes(self):
         self.history.install('tbl1')
@@ -63,24 +65,24 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.history.commit("Add 23 and 42")
 
-        self.assertEqual(self._select_all('undo_step'), [(1, "Add 23 and 42")])
+        self.assertEqual(self._select_all('undo_redo_step'), [(1, 0, "Add 23 and 42")])
 
     def test_commit_after_no_changes(self):
         self.history.install('tbl1')
 
         self.test_cursor.execute("INSERT INTO tbl1 VALUES(?)", (23,))
         self.history.commit("Add 23")
-        self.assertEqual(self._select_all('undo_step'), [(1, "Add 23")])
+        self.assertEqual(self._select_all('undo_redo_step'), [(1, 0, "Add 23")])
 
         self.history.commit("Nothing")
 
-        self.assertEqual(self._select_all('undo_step'), [(1, "Add 23")])
+        self.assertEqual(self._select_all('undo_redo_step'), [(1, 0, "Add 23")])
 
     def test_undo(self):
         with mock.patch.object(self.history, '_step') as mock_step:
             self.history.undo()
 
-        mock_step.assert_called_with('undo_step', 'redo_step')
+        mock_step.assert_called_with(is_redo=False)
 
     def test_undo_insert(self):
         self.history.install('tbl1')
@@ -91,8 +93,7 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.history.undo()
 
-        self.assertEqual(self._select_all('undo_step'), [])
-        self.assertEqual(self._select_all('redo_step'), [(1, "Add 23")])
+        self.assertEqual(self._select_all('undo_redo_step'), [(1, 1, "Add 23")])
         self.assertEqual(self._select_all('tbl1'), [])
 
     def test_undo_update(self):
@@ -106,8 +107,10 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.history.undo()
 
-        self.assertEqual(self._select_all('undo_step'), [(1, "Add 23")])
-        self.assertEqual(self._select_all('redo_step'), [(1, "Change 23 to 42")])
+        self.assertEqual(
+            self._select_all('undo_redo_step'),
+            [(1, 0, "Add 23"), (2, 1, "Change 23 to 42")],
+        )
         self.assertEqual(self._select_all('tbl1'), [(23,)])
 
     def test_undo_delete(self):
@@ -121,8 +124,9 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.history.undo()
 
-        self.assertEqual(self._select_all('undo_step'), [(1, "Add 23")])
-        self.assertEqual(self._select_all('redo_step'), [(1, "Remove 23")])
+        self.assertEqual(
+            self._select_all('undo_redo_step'), [(1, 0, "Add 23"), (2, 1, "Remove 23")]
+        )
         self.assertEqual(self._select_all('tbl1'), [(23,)])
 
     def test_undo_several_changes(self):
@@ -137,15 +141,14 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.history.undo()
 
-        self.assertEqual(self._select_all('undo_step'), [])
-        self.assertEqual(self._select_all('redo_step'), [(1, "Several changes")])
+        self.assertEqual(self._select_all('undo_redo_step'), [(1, 1, "Several changes")])
         self.assertEqual(self._select_all('tbl1'), [])
 
     def test_redo(self):
         with mock.patch.object(self.history, '_step') as mock_step:
             self.history.redo()
 
-        mock_step.assert_called_with('redo_step', 'undo_step')
+        mock_step.assert_called_with(is_redo=True)
 
     def test_redo_insert(self):
         self.history.install('tbl1')
@@ -157,8 +160,7 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.history.redo()
 
-        self.assertEqual(self._select_all('undo_step'), [(1, "Add 23")])
-        self.assertEqual(self._select_all('redo_step'), [])
+        self.assertEqual(self._select_all('undo_redo_step'), [(1, 0, "Add 23")])
         self.assertEqual(self._select_all('tbl1'), [(23,)])
 
     def test_redo_update(self):
@@ -174,9 +176,9 @@ class SQLiteUndoRedoTest(unittest.TestCase):
         self.history.redo()
 
         self.assertEqual(
-            self._select_all('undo_step'), [(1, "Add 23"), (2, "Change 23 to 42")]
+            self._select_all('undo_redo_step'),
+            [(1, 0, "Add 23"), (2, 0, "Change 23 to 42")],
         )
-        self.assertEqual(self._select_all('redo_step'), [])
         self.assertEqual(self._select_all('tbl1'), [(42,)])
 
     def test_redo_delete(self):
@@ -191,8 +193,9 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.history.redo()
 
-        self.assertEqual(self._select_all('undo_step'), [(1, "Add 23"), (2, "Remove 23")])
-        self.assertEqual(self._select_all('redo_step'), [])
+        self.assertEqual(
+            self._select_all('undo_redo_step'), [(1, 0, "Add 23"), (2, 0, "Remove 23")]
+        )
         self.assertEqual(self._select_all('tbl1'), [])
 
     def test_redo_several_changes(self):
@@ -208,14 +211,12 @@ class SQLiteUndoRedoTest(unittest.TestCase):
 
         self.history.redo()
 
-        self.assertEqual(self._select_all('undo_step'), [(1, "Several changes")])
-        self.assertEqual(self._select_all('redo_step'), [])
+        self.assertEqual(self._select_all('undo_redo_step'), [(1, 0, "Several changes")])
         self.assertEqual(self._select_all('tbl1'), [(69,)])
 
     def test___init__(self):
         self.assertIs(self.history._cursor, self.test_cursor)
-        self.assertEqual(self._select_all('undo_step'), [])
-        self.assertEqual(self._select_all('redo_step'), [])
+        self.assertEqual(self._select_all('undo_redo_step'), [], [])
 
     def _get_triggers(self, db):
         return db.execute(

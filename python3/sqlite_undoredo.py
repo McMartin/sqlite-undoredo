@@ -33,19 +33,13 @@ class SQLiteUndoHistory:
         except apsw.SQLError:
             pass
         self._cursor.execute("PRAGMA foreign_keys = ON")
-        self._cursor.execute("""CREATE TEMP TABLE undo_step(
-            id INTEGER PRIMARY KEY, text TEXT NOT NULL
-        )""")
-        self._cursor.execute("""CREATE TEMP TABLE redo_step(
-            id INTEGER PRIMARY KEY, text TEXT NOT NULL
+        self._cursor.execute("""CREATE TEMP TABLE undo_redo_step(
+            id INTEGER PRIMARY KEY, is_redo INTEGER NOT NULL, text TEXT NOT NULL
         )""")
         self._cursor.execute("""CREATE TEMP TABLE undo_redo_action(
             sql TEXT NOT NULL,
-            undo_step INTEGER,
-            redo_step INTEGER,
-            FOREIGN KEY(undo_step) REFERENCES undo_step(id) ON DELETE CASCADE,
-            FOREIGN KEY(redo_step) REFERENCES redo_step(id) ON DELETE CASCADE,
-            CHECK(undo_step IS NULL OR redo_step IS NULL)
+            step INTEGER,
+            FOREIGN KEY(step) REFERENCES undo_redo_step(id) ON DELETE CASCADE
         )""")
 
     def install(self, table):
@@ -90,46 +84,46 @@ class SQLiteUndoHistory:
 
     def commit(self, text):
         uncommitted_actions_count = self._cursor.execute(
-            "SELECT COUNT(rowid) FROM undo_redo_action"
-            " WHERE undo_step IS NULL AND redo_step IS NULL"
+            "SELECT COUNT(rowid) FROM undo_redo_action WHERE step IS NULL"
         ).fetchone()[0]
 
         if uncommitted_actions_count:
-            undo_step_id = self._cursor.execute(
-                "INSERT INTO undo_step (text) VALUES(?) RETURNING id", (text,)
+            step_id = self._cursor.execute(
+                "INSERT INTO undo_redo_step (is_redo, text) VALUES(?, ?) RETURNING id",
+                (0, text),
             ).fetchone()[0]
             self._cursor.execute(
-                "UPDATE undo_redo_action SET undo_step = ?"
-                " WHERE undo_step IS NULL AND redo_step IS NULL",
-                (undo_step_id,)
+                "UPDATE undo_redo_action SET step = ? WHERE step IS NULL",
+                (step_id,)
             )
-            self._cursor.execute("DELETE FROM redo_step")
+            self._cursor.execute("DELETE FROM undo_redo_step WHERE is_redo = ?", (1,))
 
-    def _step(self, lhs_table, rhs_table):
+    def _step(self, is_redo):
         self._cursor.execute('BEGIN')
         step_id, text = self._cursor.execute(
-            f"SELECT id, text FROM {lhs_table} ORDER BY rowid DESC LIMIT 1"
+            "SELECT id, text FROM undo_redo_step WHERE is_redo = ?"
+            " ORDER BY rowid DESC LIMIT 1",
+            (int(is_redo),),
         ).fetchone()
         sql_statements = self._cursor.execute(
-            f"SELECT sql FROM undo_redo_action WHERE {lhs_table} = ? ORDER BY rowid DESC",
+            "SELECT sql FROM undo_redo_action WHERE step = ? ORDER BY rowid DESC",
             (step_id,),
         ).fetchall()
-        self._cursor.execute(f"DELETE FROM {lhs_table} WHERE id = ?", (step_id,))
+        self._cursor.execute("DELETE FROM undo_redo_step WHERE id = ?", (step_id,))
         for (statement,) in sql_statements:
             self._cursor.execute(statement)
         self._cursor.execute('COMMIT')
 
         step_id = self._cursor.execute(
-            f"INSERT INTO {rhs_table} (text) VALUES(?) RETURNING id", (text,)
+            "INSERT INTO undo_redo_step (is_redo, text) VALUES(?, ?) RETURNING id",
+            (int(not is_redo), text),
         ).fetchone()[0]
         self._cursor.execute(
-            f"UPDATE undo_redo_action SET {rhs_table} = ?"
-            " WHERE undo_step IS NULL AND redo_step IS NULL",
-            (step_id,)
+            "UPDATE undo_redo_action SET step = ? WHERE step IS NULL", (step_id,)
         )
 
     def undo(self):
-        self._step('undo_step', 'redo_step')
+        self._step(is_redo=False)
 
     def redo(self):
-        self._step('redo_step', 'undo_step')
+        self._step(is_redo=True)
