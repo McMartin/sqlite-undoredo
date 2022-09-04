@@ -1,7 +1,4 @@
-# Copied from https://www.sqlite.org/undoredo.html and changed
-#
-# Changes:
-# - removed extraneous "}; hd_resolve_one {" and "}; hd_puts {"
+# Copied from https://www.sqlite.org/undoredo.html
 
 
 # Everything goes in a private namespace
@@ -46,9 +43,9 @@ proc deactivate {} {
 #
 proc freeze {} {
   variable _undo
-  if {!info exists _undo(freeze)} return
+  if {!}; hd_resolve_one {info exists _undo(freeze)}; hd_puts {} return
   if {$_undo(freeze)>=0} {error "recursive call to ::undo::freeze"}
-  set _undo(freeze) db one {SELECT coalesce(max(seq),0) FROM undolog}
+  set _undo(freeze) }; hd_resolve_one {db one {SELECT coalesce(max(seq),0) FROM undolog}}; hd_puts {
 }
 
 # proc:  ::undo::unfreeze
@@ -56,7 +53,7 @@ proc freeze {} {
 #
 proc unfreeze {} {
   variable _undo
-  if {!info exists _undo(freeze)} return
+  if {!}; hd_resolve_one {info exists _undo(freeze)}; hd_puts {} return
   if {$_undo(freeze)<0} {error "called ::undo::unfreeze while not frozen"}
   db eval "DELETE FROM undolog WHERE seq>$_undo(freeze)"
   set _undo(freeze) -1
@@ -71,7 +68,7 @@ proc unfreeze {} {
 proc event {} {
   variable _undo
   if {$_undo(pending)==""} {
-    set _undo(pending) after idle ::undo::barrier
+    set _undo(pending) }; hd_resolve_one {after idle ::undo::barrier}; hd_puts {
   }
 }
 
@@ -86,7 +83,7 @@ proc barrier {} {
     refresh
     return
   }
-  set end db one {SELECT coalesce(max(seq),0) FROM undolog}
+  set end }; hd_resolve_one {db one {SELECT coalesce(max(seq),0) FROM undolog}}; hd_puts {
   if {$_undo(freeze)>=0 && $end>$_undo(freeze)} {set end $_undo(freeze)}
   set begin $_undo(firstlog)
   _start_interval
@@ -94,7 +91,7 @@ proc barrier {} {
     refresh
     return
   }
-  lappend _undo(undostack) list $begin $end
+  lappend _undo(undostack) }; hd_resolve_one {list $begin $end}; hd_puts {
   set _undo(redostack) {}
   refresh
 }
@@ -123,8 +120,8 @@ proc redo {} {
 #
 proc refresh {} {
   set body {}
-  foreach ns namespace children :: {
-    if {info proc ${ns}::status_refresh==""} continue
+  foreach ns }; hd_resolve_one {namespace children ::}; hd_puts { {
+    if {}; hd_resolve_one {info proc ${ns}::status_refresh}; hd_puts {==""} continue
     append body ${ns}::status_refresh\n
   }
   proc ::undo::refresh {} $body
@@ -141,8 +138,8 @@ proc refresh {} {
 #
 proc reload_all {} {
   set body {}
-  foreach ns namespace children :: {
-    if {info proc ${ns}::reload==""} continue
+  foreach ns }; hd_resolve_one {namespace children ::}; hd_puts { {
+    if {}; hd_resolve_one {info proc ${ns}::reload}; hd_puts {==""} continue
     append body ${ns}::reload\n
   }
   proc ::undo::reload_all {} $body
@@ -169,14 +166,14 @@ set _undo(startstate) {}
 #
 proc status_refresh {} {
   variable _undo
-  if {!$_undo(active) || llength $_undo(undostack)==0} {
+  if {!$_undo(active) || }; hd_resolve_one {llength $_undo(undostack)}; hd_puts {==0} {
     .mb.edit entryconfig Undo -state disabled
     .bb.undo config -state disabled
   } else {
     .mb.edit entryconfig Undo -state normal
     .bb.undo config -state normal
   }
-  if {!$_undo(active) || llength $_undo(redostack)==0} {
+  if {!$_undo(active) || }; hd_resolve_one {llength $_undo(redostack)}; hd_puts {==0} {
     .mb.edit entryconfig Redo -state disabled
     .bb.redo config -state disabled
   } else {
@@ -197,7 +194,7 @@ proc _create_triggers {db args} {
   catch {$db eval {DROP TABLE undolog}}
   $db eval {CREATE TEMP TABLE undolog(seq integer primary key, sql text)}
   foreach tbl $args {
-    set collist $db eval "pragma table_info($tbl)"
+    set collist }; hd_resolve_one {$db eval "pragma table_info($tbl)"}; hd_puts {
     set sql "CREATE TEMP TRIGGER _${tbl}_it AFTER INSERT ON $tbl BEGIN\n"
     append sql "  INSERT INTO undolog VALUES(NULL,"
     append sql "'DELETE FROM $tbl WHERE rowid='||new.rowid);\nEND;\n"
@@ -228,10 +225,10 @@ proc _create_triggers {db args} {
 # title:  Drop all of the triggers that _create_triggers created
 #
 proc _drop_triggers {db} {
-  set tlist $db eval {SELECT name FROM sqlite_temp_schema
-                       WHERE type='trigger'}
+  set tlist }; hd_resolve_one {$db eval {SELECT name FROM sqlite_temp_schema
+                       WHERE type='trigger'}}; hd_puts {
   foreach trigger $tlist {
-    if {!regexp {_.*_(i|u|d)t$} $trigger} continue
+    if {!}; hd_resolve_one {regexp {_.*_(i|u|d)t$} $trigger}; hd_puts {} continue
     $db eval "DROP TRIGGER $trigger;"
   }
   catch {$db eval {DROP TABLE undolog}}
@@ -242,7 +239,7 @@ proc _drop_triggers {db} {
 #
 proc _start_interval {} {
   variable _undo
-  set _undo(firstlog) db one {SELECT coalesce(max(seq),0)+1 FROM undolog}
+  set _undo(firstlog) }; hd_resolve_one {db one {SELECT coalesce(max(seq),0)+1 FROM undolog}}; hd_puts {
 }
 
 # xproc: ::undo::_step V1 V2
@@ -253,24 +250,24 @@ proc _start_interval {} {
 #
 proc _step {v1 v2} {
   variable _undo
-  set op lindex $_undo($v1) end
-  set _undo($v1) lrange $_undo($v1) 0 end-1
+  set op }; hd_resolve_one {lindex $_undo($v1) end}; hd_puts {
+  set _undo($v1) }; hd_resolve_one {lrange $_undo($v1) 0 end-1}; hd_puts {
   foreach {begin end} $op break
   db eval BEGIN
   set q1 "SELECT sql FROM undolog WHERE seq>=$begin AND seq<=$end
           ORDER BY seq DESC"
-  set sqllist db eval $q1
+  set sqllist }; hd_resolve_one {db eval $q1}; hd_puts {
   db eval "DELETE FROM undolog WHERE seq>=$begin AND seq<=$end"
-  set _undo(firstlog) db one {SELECT coalesce(max(seq),0)+1 FROM undolog}
+  set _undo(firstlog) }; hd_resolve_one {db one {SELECT coalesce(max(seq),0)+1 FROM undolog}}; hd_puts {
   foreach sql $sqllist {
     db eval $sql
   }
   db eval COMMIT
   reload_all
 
-  set end db one {SELECT coalesce(max(seq),0) FROM undolog}
+  set end }; hd_resolve_one {db one {SELECT coalesce(max(seq),0) FROM undolog}}; hd_puts {
   set begin $_undo(firstlog)
-  lappend _undo($v2) list $begin $end
+  lappend _undo($v2) }; hd_resolve_one {list $begin $end}; hd_puts {
   _start_interval
   refresh
 }
