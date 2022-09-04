@@ -1,4 +1,4 @@
-# Copyright 2021 Alain Martin
+# Copyright 2021-2022 Alain Martin
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,15 +19,15 @@ project(sqlite-undoredo)
 
 add_executable(test_sqlite_undoredo
   test_sqlite_undoredo.cpp
-  "${CMAKE_CURRENT_LIST_DIR}/../third-party/sqlite-amalgamation-3360000/sqlite3.c"
+  "${CMAKE_CURRENT_LIST_DIR}/../third-party/sqlite/sqlite3.c"
 )
 
 target_compile_features(test_sqlite_undoredo PRIVATE cxx_std_17)
 
 target_include_directories(test_sqlite_undoredo PRIVATE
   "${CMAKE_CURRENT_LIST_DIR}/../third-party/cpp-sqlitelib"
-  "${CMAKE_CURRENT_LIST_DIR}/../third-party/doctest-2.4.6"
-  "${CMAKE_CURRENT_LIST_DIR}/../third-party/sqlite-amalgamation-3360000"
+  "${CMAKE_CURRENT_LIST_DIR}/../third-party/doctest"
+  "${CMAKE_CURRENT_LIST_DIR}/../third-party/sqlite"
 )
 
 if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux")
