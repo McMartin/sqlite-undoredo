@@ -8,7 +8,7 @@ From https://github.com/yhirose/cpp-sqlitelib/tree/ed76abe70fb5e80e0e778a8b751ce
 
 ## doctest
 
-From https://github.com/doctest/doctest/tree/2.4.6
+From https://github.com/doctest/doctest/tree/v2.4.9
 
 
 ## sqlite
