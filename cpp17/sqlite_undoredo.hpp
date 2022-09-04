@@ -251,7 +251,7 @@ struct SQLiteUndoRedo
     auto tlist = db.execute<std::string>("SELECT name FROM sqlite_temp_schema"
                                          " WHERE type='trigger'");
     for (const auto& trigger : tlist) {
-      if (!std::regex_match(trigger, std::regex{"_.*_(i|u|d)t$"})) continue;
+      if (!std::regex_match(trigger, std::regex{"^_.*_(i|u|d)t$"})) continue;
       db.execute(("DROP TRIGGER "s + trigger + ";").c_str());
     }
     try {

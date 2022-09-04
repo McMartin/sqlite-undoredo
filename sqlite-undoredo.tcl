@@ -1,4 +1,4 @@
-# Copied from https://www.sqlite.org/undoredo.html
+# Copied from https://www.sqlite.org/cgi/docsrc/artifact/741a21510c
 
 
 # Everything goes in a private namespace
@@ -228,7 +228,7 @@ proc _drop_triggers {db} {
   set tlist [$db eval {SELECT name FROM sqlite_temp_schema
                        WHERE type='trigger'}]
   foreach trigger $tlist {
-    if {![regexp {_.*_(i|u|d)t$} $trigger]} continue
+    if {![regexp {^_.*_(i|u|d)t$} $trigger]} continue
     $db eval "DROP TRIGGER $trigger;"
   }
   catch {$db eval {DROP TABLE undolog}}

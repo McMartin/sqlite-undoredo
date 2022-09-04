@@ -234,7 +234,7 @@ class SQLiteUndoRedo:
         tlist = db.execute(
             "SELECT name FROM sqlite_temp_master WHERE type='trigger'").fetchall()
         for (trigger,) in tlist:
-            if not re.match("_.*_(i|u|d)t$", trigger):
+            if not re.match("^_.*_(i|u|d)t$", trigger):
                 continue
             db.execute(f"DROP TRIGGER {trigger};")
         try:
