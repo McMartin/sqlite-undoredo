@@ -13,4 +13,4 @@ From https://github.com/doctest/doctest/tree/v2.4.9
 
 ## sqlite
 
-From https://www.sqlite.org/2021/sqlite-amalgamation-3360000.zip
+From https://www.sqlite.org/2022/sqlite-amalgamation-3390200.zip
