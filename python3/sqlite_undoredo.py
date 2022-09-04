@@ -1,4 +1,4 @@
-# Copyright 2019, 2021 Alain Martin
+# Copyright 2019, 2021-2022 Alain Martin
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Translation of the TCL example code from https://www.sqlite.org/undoredo.html."""
+"""Translation of the Tcl example code from https://www.sqlite.org/undoredo.html."""
 
 import re
 import sqlite3
@@ -234,7 +234,7 @@ class SQLiteUndoRedo:
         tlist = db.execute(
             "SELECT name FROM sqlite_temp_master WHERE type='trigger'").fetchall()
         for (trigger,) in tlist:
-            if not re.match("_.*_(i|u|d)t$", trigger):
+            if not re.match("^_.*_(i|u|d)t$", trigger):
                 continue
             db.execute(f"DROP TRIGGER {trigger};")
         try:

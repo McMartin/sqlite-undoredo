@@ -1,4 +1,4 @@
-// Copyright 2021 Alain Martin
+// Copyright 2021-2022 Alain Martin
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Translation of the TCL example code from https://www.sqlite.org/undoredo.html.
+//! Translation of the Tcl example code from https://www.sqlite.org/undoredo.html.
 
 #pragma once
 
@@ -251,7 +251,7 @@ struct SQLiteUndoRedo
     auto tlist = db.execute<std::string>("SELECT name FROM sqlite_temp_schema"
                                          " WHERE type='trigger'");
     for (const auto& trigger : tlist) {
-      if (!std::regex_match(trigger, std::regex{"_.*_(i|u|d)t$"})) continue;
+      if (!std::regex_match(trigger, std::regex{"^_.*_(i|u|d)t$"})) continue;
       db.execute(("DROP TRIGGER "s + trigger + ";").c_str());
     }
     try {
